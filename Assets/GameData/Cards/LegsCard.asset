@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1bf10ac49ae588d45a9b82a1a9490368, type: 3}
+  m_Name: LegsCard
+  m_EditorClassIdentifier: 
+  cardId: LegsCard
+  cardName: "\u519B\u7528\u6218\u672F\u63A8\u8FDB\u5668"
+  artwork: {fileID: 0}
+  description: "\u7ED3\u675F\u56DE\u5408\u65F6\u8DF3\u8FC7\u654C\u4EBA\uFF0C\u8FDB\u5165\u4E00\u4E2A\u5B8C\u6574\u7684\u65B0\u73A9\u5BB6\u56DE\u5408\u3002"
+  cost: 0
+  category: 2
+  sanityCost: 8
+  effects:
+  - {fileID: 11400000, guid: b93c2806c31ae1145b6e8d25bdbfe744, type: 2}
+  locksInHand: 0
+  cardType: 2
+  targetType: 1

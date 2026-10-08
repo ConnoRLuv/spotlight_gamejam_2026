@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1bf10ac49ae588d45a9b82a1a9490368, type: 3}
+  m_Name: PhantomPain
+  m_EditorClassIdentifier: 
+  cardId: phantom-pain
+  cardName: "\u5E7B\u75DB"
+  artwork: {fileID: 0}
+  description: "\u65E0\u6CD5\u79BB\u5F00\u624B\u724C\u3002\n\u73A9\u5BB6\u9020\u6210\u7684\u4F24\u5BB3\u76EE\u6807\u968F\u673A\uFF0C\u5305\u542B\u73A9\u5BB6\u81EA\u8EAB\u3002"
+  cost: 0
+  category: 3
+  sanityCost: 0
+  effects: []
+  locksInHand: 1
+  cardType: 0
+  targetType: 0

@@ -1,0 +1,6 @@
+{
+    "name": "SpotlightGameJam.UI",
+    "rootNamespace": "SpotlightGameJam.UI",
+    "references": ["SpotlightGameJam.Runtime", "UnityEngine.UI", "DOTween.Modules"],
+    "autoReferenced": true
+}

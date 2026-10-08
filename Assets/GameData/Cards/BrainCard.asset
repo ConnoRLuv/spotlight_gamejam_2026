@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1bf10ac49ae588d45a9b82a1a9490368, type: 3}
+  m_Name: BrainCard
+  m_EditorClassIdentifier: 
+  cardId: BrainCard
+  cardName: "\u519B\u7528\u6218\u672F\u534F\u8C03\u77E9\u9635"
+  artwork: {fileID: 0}
+  description: "\u67E5\u770B\u4E49\u4F53\u62BD\u724C\u5806\u9876\u6700\u591A 3 \u5F20\uFF0C\u9009\u62E9
+    1 \u5F20\u52A0\u5165\u624B\u724C\u3002"
+  cost: 0
+  category: 2
+  sanityCost: 8
+  effects:
+  - {fileID: 11400000, guid: 601ec43f2ba76c34c8c1f2a1a37711fd, type: 2}
+  locksInHand: 0
+  cardType: 2
+  targetType: 1

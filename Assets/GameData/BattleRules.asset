@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ca0b968d71586824598f25a2fc2075ba, type: 3}
+  m_Name: BattleRules
+  m_EditorClassIdentifier: 
+  maxHealth: 100
+  maxSanity: 50
+  initialAp: 2
+  apGrowth: 1
+  maxAp: 12
+  ordinaryDraw: 3
+  cyberneticDraw: 1
+  ordinaryCapacity: 13
+  cyberneticCapacity: 5
+  usesPerSlot: 3

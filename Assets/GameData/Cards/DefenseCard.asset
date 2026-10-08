@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1bf10ac49ae588d45a9b82a1a9490368, type: 3}
+  m_Name: DefenseCard
+  m_EditorClassIdentifier: 
+  cardId: DefenseCard
+  cardName: "\u9632\u5FA1"
+  artwork: {fileID: 0}
+  description: "\u83B7\u5F97 3 \u70B9\u62A4\u76FE\u3002\n\u4E0B\u4E2A\u73A9\u5BB6\u56DE\u5408\u5F00\u59CB\u65F6\u6E05\u9664\u3002"
+  cost: 1
+  category: 0
+  sanityCost: 0
+  effects:
+  - {fileID: 11400000, guid: ad66f0b650a322a46beead18da90a2d5, type: 2}
+  locksInHand: 0
+  cardType: 1
+  targetType: 1
