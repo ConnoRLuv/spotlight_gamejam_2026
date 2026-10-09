@@ -200,6 +200,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 742f18cc88b42e446af7a7232f54f036, type: 2}
   - {fileID: 11400000, guid: 742f18cc88b42e446af7a7232f54f036, type: 2}
   - {fileID: 11400000, guid: 742f18cc88b42e446af7a7232f54f036, type: 2}
+  - {fileID: 11400000, guid: cf726b8d3c130e34e829d6a9c9d067a6, type: 2}
   phantomPain: {fileID: 11400000, guid: 993cf03c107e65944a68bc0200c07050, type: 2}
   initialCybernetics:
   - {fileID: 11400000, guid: 230cf1632ca38a949a2d24a15c5dd002, type: 2}

@@ -15,6 +15,7 @@ namespace SpotlightGameJam.Tests
             var data = AssetDatabase.LoadAssetAtPath<CardData>("Assets/GameData/Cards/OverloadCard.asset");
             Assert.That(data, Is.Not.Null, "过载配置尚未创建。");
             Assert.That(data.Validate(), Is.Empty);
+            Assert.That(data.sanityCost, Is.EqualTo(5), "过载应使用已确认的 5 点理智费用。");
             return data;
         }
         /// <summary>为测试装备义体，满足功能牌的装备前置条件。</summary>
