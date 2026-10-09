@@ -9,7 +9,7 @@ namespace SpotlightGameJam
     /// <remarks>
     /// 复用 RunState 中的玩家和义体，单独新建 AP 与部位使用计数；由 BattleController 组织结算并通知 UI。
     /// </remarks>
-    public sealed class BattleContext
+    public sealed class BattleContext : IDisposable
     {
         public RunState Run { get; }
         public BattleRules Rules { get; }
@@ -25,6 +25,7 @@ namespace SpotlightGameJam
         public BattleTurnEffects TurnEffects { get; } = new BattleTurnEffects();
         // 已成功使用的卡牌由本场战斗持有；不会因切换 UI 或新回合丢失，也不跨战斗复用。
         private readonly CardInstance[] usedCyberneticCards = new CardInstance[4];
+        private int observedSanity;
         /// <summary>获取对应部位本场最后成功使用的义体牌；未使用或来源装备已替换时为空。</summary>
         public CardInstance GetUsedCyberneticCard(CyberneticSlot slot)
         {
@@ -55,6 +56,8 @@ namespace SpotlightGameJam
             Ordinary = ordinary; Cybernetic = cybernetic; PhantomPain = phantomPain; Random = random;
             // 每个 Context 新建次数记录；只让义体实例的耐久跨战斗保留。
             Usage = new CyberneticUsage(rules.UsesPerSlot);
+            observedSanity = Player.Sanity;
+            Player.Changed += OnPlayerChanged;
         }
         /// <summary>
         /// 切换阶段并通知订阅者；同一阶段不会重复触发事件。
@@ -72,13 +75,31 @@ namespace SpotlightGameJam
         internal void NotifyChanged() => Changed?.Invoke(this);
         public bool HasPhantomPain => Ordinary.Hand.Cards.Any(c => c.Data == PhantomPain);
         /// <summary>
-        /// 理智为零时确保唯一幻痛在普通手牌中；空间处理交给 CardDeck。
+        /// 理智归零登记持久幻痛并立即入手，满手随机弃普通牌；恢复为正数则移除当前幻痛。
         /// </summary>
         public void EnsurePhantomPain()
         {
-            if (Player.Sanity == 0 && !Ordinary.EnsureLockedCard(PhantomPain))
-                throw new InvalidOperationException("普通手牌不存在可供幻痛进入的空间。");
+            if (Player.Sanity == 0)
+            {
+                Run.AddPhantomPain(PhantomPain);
+                if (!Ordinary.EnsureLockedCard(Run.PhantomPain))
+                    throw new InvalidOperationException("普通手牌没有可弃置的非锁定牌，无法补入幻痛。");
+            }
+            else Ordinary.RemoveLockedCard(PhantomPain);
         }
+        /// <summary>同步理智变化引发的幻痛增删；完整结算期间由控制器统一通知 UI。</summary>
+        private void OnPlayerChanged(CombatantState player)
+        {
+            // 同一资源事件也涵盖生命和护盾；只有理智实际变化才同步幻痛。
+            if (observedSanity == player.Sanity) return;
+            observedSanity = player.Sanity;
+            // 开战校验通过前不改变牌区，保留配置失败时的无副作用约定。
+            if (State == BattleState.NotStarted) return;
+            EnsurePhantomPain();
+            if (!IsResolving) NotifyChanged();
+        }
+        /// <summary>解除持久玩家事件订阅，避免上一场战斗继续接收新战斗或地图的资源变化。</summary>
+        public void Dispose() => Player.Changed -= OnPlayerChanged;
         /// <summary>
         /// 即时判断胜负；同时失去生存条件时优先判定玩家失败。
         /// </summary>

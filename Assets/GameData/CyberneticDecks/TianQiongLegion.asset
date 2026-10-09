@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 11ef22929c74ac44b87335d4b90d6ea9, type: 3}
+  m_Name: TianQiongLegion
+  m_EditorClassIdentifier: 
+  deckId: tianqiong-legion
+  deckName: "\u5929\u7A79\u519B\u56E2\u5236\u5F0F\u4E49\u4F53"
+  cybernetics:
+  - {fileID: 11400000, guid: 230cf1632ca38a949a2d24a15c5dd002, type: 2}
+  - {fileID: 11400000, guid: 0a9e9330f35baa64ba0c9a998bbfc7cd, type: 2}
+  - {fileID: 11400000, guid: 21b7d59bce687164ebc31f84df95e936, type: 2}
+  - {fileID: 11400000, guid: 88c1f43e9dbf7314cb15f327bae931a2, type: 2}

@@ -146,6 +146,73 @@ namespace SpotlightGameJam.Tests
             battle.EndTurn();
             Assert.That(context.Ordinary.Hand.Cards.Count(c => c.Data == context.PhantomPain), Is.EqualTo(1));
         }
+        /// <summary>验证幻痛记录在冒险牌组中，下一场仍入手；地图阶段恢复理智后不再携带。</summary>
+        [Test]
+        public void PhantomPersistsAcrossEncountersUntilSanityRecovers()
+        {
+            var rules = assets.Create<BattleRules>(); var run = new RunState(rules);
+            var heal = assets.Card(assets.Create<HealEffectData>()); var phantom = assets.Phantom();
+            var first = Encounter(run, rules, heal, phantom: phantom);
+            var firstBattle = new BattleController(first, 0); Assert.That(firstBattle.StartBattle(), Is.True);
+            run.Player.TrySpendSanity(50);
+            Assert.That(first.HasPhantomPain, Is.True);
+            Assert.That(run.PhantomPain, Is.SameAs(phantom));
+            first.Enemies[0].ReceiveDamage(100); first.CheckOutcome(); first.Dispose();
+
+            var second = Encounter(run, rules, heal, phantom: phantom);
+            var secondBattle = new BattleController(second, 0); Assert.That(secondBattle.StartBattle(), Is.True);
+            Assert.That(second.Ordinary.Hand.Cards.Count(c => c.Data == phantom), Is.EqualTo(1));
+            Assert.That(second.Ordinary.Hand.Count, Is.EqualTo(4), "携带幻痛之外，首回合仍正常抽三张普通牌。");
+            second.Enemies[0].ReceiveDamage(100); second.CheckOutcome(); second.Dispose();
+            // 模拟后续地图购买或事件恢复入口；不实现地图本身。
+            run.Player.RestoreSanity(1);
+            Assert.That(run.PhantomPain, Is.Null);
+
+            var third = Encounter(run, rules, heal, phantom: phantom);
+            var thirdBattle = new BattleController(third, 0); Assert.That(thirdBattle.StartBattle(), Is.True);
+            Assert.That(third.HasPhantomPain, Is.False);
+            Assert.That(third.Ordinary.Hand.Count, Is.EqualTo(3));
+            third.Dispose();
+        }
+        /// <summary>验证战斗内恢复至正理智，幻痛立即移除且通知界面；再次归零可重新加入唯一幻痛。</summary>
+        [Test]
+        public void SanityRecoveryRemovesPhantomWithoutDiscardAndAllowsRetrigger()
+        {
+            var heal = assets.Card(assets.Create<HealEffectData>());
+            var context = assets.Context(Enumerable.Repeat(heal, 20).ToArray());
+            var battle = new BattleController(context, 0); Assert.That(battle.StartBattle(), Is.True);
+            context.Ordinary.Draw(10); context.Player.TrySpendSanity(50);
+            var phantom = context.Ordinary.Hand.Cards.Single(c => c.Data == context.PhantomPain);
+            int discards = context.Ordinary.DiscardPile.Count;
+            int notifications = 0; context.Changed += _ => notifications++;
+            context.Player.RestoreSanity(0);
+            Assert.That(context.HasPhantomPain, Is.True);
+            context.Player.RestoreSanity(1);
+            Assert.That(context.Player.Sanity, Is.EqualTo(1));
+            Assert.That(context.HasPhantomPain, Is.False);
+            Assert.That(context.Run.PhantomPain, Is.Null);
+            Assert.That(context.Ordinary.Hand.Count, Is.EqualTo(12));
+            Assert.That(context.Ordinary.DiscardPile.Count, Is.EqualTo(discards));
+            Assert.That(phantom.Zone, Is.Null);
+            Assert.That(notifications, Is.EqualTo(1));
+            DamageResolver.Apply(context, context.Player, context.Enemies[0], 6);
+            Assert.That(context.Enemies[0].Health, Is.EqualTo(94), "恢复后伤害应命中指定目标。");
+            Assert.That(context.Player.Health, Is.EqualTo(100));
+            context.Player.TrySpendSanity(1);
+            Assert.That(context.Ordinary.Hand.Cards.Count(c => c.Data == context.PhantomPain), Is.EqualTo(1));
+            Assert.That(context.Ordinary.DiscardPile.Count, Is.EqualTo(discards));
+            context.Dispose();
+        }
+        /// <summary>验证释放战斗后不再接收冒险玩家的资源事件，避免旧牌区污染新战斗。</summary>
+        [Test]
+        public void DisposedEncounterNoLongerHandlesPlayerResourceChanges()
+        {
+            var context = assets.Context(new[] { assets.Card(assets.Create<HealEffectData>()) });
+            Assert.That(new BattleController(context, 0).StartBattle(), Is.True);
+            context.Dispose(); context.Dispose();
+            context.Player.TrySpendSanity(50);
+            Assert.That(context.HasPhantomPain, Is.False);
+        }
         /// <summary>验证非法初始配置在改变战斗状态前被拒绝。</summary>
         [Test] public void InvalidSetupFailsBeforeAnyBattleMutation()
         {

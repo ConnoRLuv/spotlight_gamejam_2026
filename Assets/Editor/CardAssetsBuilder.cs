@@ -68,7 +68,7 @@ namespace SpotlightGameJam.Editor
             var phantom = Asset<CardData>("Cards/PhantomPain", value => {
                 value.cardId = "phantom-pain"; value.cardName = "幻痛"; value.category = CardCategory.Special;
                 value.locksInHand = true; value.targetType = CardTargetType.None;
-                value.description = "无法离开手牌。\n玩家造成的伤害目标随机，包含玩家自身。";
+                value.description = "无法使用或弃置，占用普通手牌位置。\n跨战斗保留，理智恢复到大于 0 时移除。\n玩家造成的伤害目标随机，包含玩家自身。";
             });
             AssetDatabase.SaveAssets();
             WireScene(cards, cybernetics, catalog, rules, phantom);
@@ -195,7 +195,9 @@ namespace SpotlightGameJam.Editor
             var bootstrap = new GameObject("BattleGame", typeof(GameBootstrap)).GetComponent<GameBootstrap>();
             var boot = new SerializedObject(bootstrap);
             Set(boot, "rules", rules); Set(boot, "phantomPain", phantom);
-            SetArray(boot, "ordinaryDeck", cards.Take(3).SelectMany(value => Enumerable.Repeat(value, 4)).Cast<UnityEngine.Object>().ToArray());
+            // 普通牌按总牌组洗牌后顺序抽取，不保证每种各一张；过载由功能牌入口追加三张。
+            SetArray(boot, "ordinaryDeck", cards.Take(3).SelectMany((value, index) => Enumerable.Repeat(value, index == 0 ? 4 : 3))
+                .Cast<UnityEngine.Object>().ToArray());
             SetArray(boot, "initialCybernetics", cybernetics.Cast<UnityEngine.Object>().ToArray());
             boot.ApplyModifiedPropertiesWithoutUndo();
 

@@ -15,6 +15,84 @@ namespace SpotlightGameJam.Tests
     public sealed class ConfigurationTests
     {
         private TestAssets assets;
+        /// <summary>验证可切换义体牌组，所选牌组覆盖旧入口并保留各卡牌的真实义体来源。</summary>
+        [Test]
+        public void SelectedCyberneticDeckOverridesLegacyInitialLoadout()
+        {
+            var deck = assets.Create<CyberneticDeckData>();
+            var owner = new GameObject("Cybernetic deck selection test");
+            try
+            {
+                var selected = assets.Create<CyberneticData>(); selected.cyberneticId = "future-brain";
+                selected.slot = CyberneticSlot.Brain;
+                var card = assets.Card(assets.Create<ShieldEffectData>(), category: CardCategory.Cybernetic, ap: 0, sanity: 2);
+                selected.cards = Enumerable.Repeat(card, 3).ToArray();
+                var legacy = assets.Create<CyberneticData>(); legacy.cyberneticId = "legacy-hands";
+                legacy.slot = CyberneticSlot.Hands; legacy.cards = new[] { card };
+                var deckSettings = new SerializedObject(deck);
+                deckSettings.FindProperty("deckId").stringValue = "future-set";
+                deckSettings.FindProperty("deckName").stringValue = "测试义体牌组";
+                var entries = deckSettings.FindProperty("cybernetics"); entries.arraySize = 1;
+                entries.GetArrayElementAtIndex(0).objectReferenceValue = selected;
+                deckSettings.ApplyModifiedPropertiesWithoutUndo();
+
+                var bootstrap = owner.AddComponent<GameBootstrap>();
+                var settings = new SerializedObject(bootstrap);
+                settings.FindProperty("rules").objectReferenceValue = assets.Create<BattleRules>();
+                settings.FindProperty("phantomPain").objectReferenceValue = assets.Phantom();
+                var oldEntries = settings.FindProperty("initialCybernetics"); oldEntries.arraySize = 1;
+                oldEntries.GetArrayElementAtIndex(0).objectReferenceValue = legacy;
+                var selectedField = settings.FindProperty("initialCyberneticDeck");
+                Assert.That(selectedField, Is.Not.Null, "GameBootstrap 需要提供牌组选择字段。");
+                selectedField.objectReferenceValue = deck; settings.ApplyModifiedPropertiesWithoutUndo();
+                Assert.That(bootstrap.StartNewRun(), Is.True, bootstrap.LastError);
+                Assert.That(bootstrap.Run.Loadout.Get(CyberneticSlot.Hands), Is.Null);
+                var brain = bootstrap.Run.Loadout.Get(CyberneticSlot.Brain);
+                Assert.That(brain.Data, Is.SameAs(selected));
+                Assert.That(bootstrap.Battle.Context.Cybernetic.AllCards.Count(), Is.EqualTo(3));
+                Assert.That(bootstrap.Battle.Context.Cybernetic.AllCards.All(instance => instance.Source == brain), Is.True);
+
+                // 新牌组只作用于新冒险；本次冒险继续携带已有装备及耐久。
+                brain.TryConsumeDurability();
+                var previousRun = bootstrap.Run;
+                DamageResolver.Apply(bootstrap.Battle.Context, previousRun.Player, bootstrap.Battle.Context.Enemies[0], 100);
+                selectedField.objectReferenceValue = null; settings.ApplyModifiedPropertiesWithoutUndo();
+                Assert.That(bootstrap.StartEncounter(), Is.True, bootstrap.LastError);
+                Assert.That(bootstrap.Run.Loadout.Get(CyberneticSlot.Brain), Is.SameAs(brain));
+                Assert.That(brain.Durability, Is.EqualTo(selected.maxDurability - 1));
+
+                // 空草稿可以保存，但启用后必须在替换现有冒险前明确拒绝。
+                entries.arraySize = 0; deckSettings.ApplyModifiedPropertiesWithoutUndo();
+                settings.Update(); settings.FindProperty("initialCyberneticDeck").objectReferenceValue = deck;
+                settings.ApplyModifiedPropertiesWithoutUndo();
+                var previousBattle = bootstrap.Battle;
+                LogAssert.Expect(LogType.Error, "义体牌组至少需要一个义体配置。");
+                Assert.That(bootstrap.StartNewRun(), Is.False);
+                Assert.That(bootstrap.Run, Is.SameAs(previousRun));
+                Assert.That(bootstrap.Battle, Is.SameAs(previousBattle));
+            }
+            finally { UnityEngine.Object.DestroyImmediate(owner); }
+        }
+
+        /// <summary>验证义体牌组拒绝重复部位、空引用、缺失效果及缺失身份，避免启用未完成的配置。</summary>
+        [TestCase(0)]
+        [TestCase(1)]
+        [TestCase(2)]
+        [TestCase(3)]
+        public void CyberneticDeckRejectsIncompleteOrConflictingConfiguration(int kind)
+        {
+            var deck = assets.Create<CyberneticDeckData>(); deck.deckId = "future-set"; deck.deckName = "待扩展系列";
+            var cybernetic = assets.Create<CyberneticData>(); cybernetic.cyberneticId = "future-brain";
+            var card = assets.Card(assets.Create<ShieldEffectData>(), category: CardCategory.Cybernetic, ap: 0, sanity: 2);
+            cybernetic.cards = new[] { card }; deck.cybernetics = new[] { cybernetic };
+            Assert.That(deck.Validate(), Is.Empty);
+            if (kind == 0) deck.cybernetics = new[] { cybernetic, cybernetic };
+            if (kind == 1) deck.cybernetics = new CyberneticData[] { null };
+            if (kind == 2) card.effects = Array.Empty<CardEffectData>();
+            if (kind == 3) deck.deckId = "";
+            Assert.That(deck.Validate(), Is.Not.Empty);
+        }
+
         /// <summary>为用例创建独立的测试状态，避免用例之间共享可变资源。</summary>
         /// <summary>清理测试创建的临时对象和状态，避免污染后续用例。</summary>
         /// <summary>验证需要目标的效果缺少目标模式时，在开战前被拒绝。</summary>

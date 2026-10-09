@@ -195,19 +195,20 @@ MonoBehaviour:
   - {fileID: 11400000, guid: da3377f691396e541ad2893d785484e5, type: 2}
   - {fileID: 11400000, guid: da3377f691396e541ad2893d785484e5, type: 2}
   - {fileID: 11400000, guid: da3377f691396e541ad2893d785484e5, type: 2}
-  - {fileID: 11400000, guid: da3377f691396e541ad2893d785484e5, type: 2}
-  - {fileID: 11400000, guid: 742f18cc88b42e446af7a7232f54f036, type: 2}
   - {fileID: 11400000, guid: 742f18cc88b42e446af7a7232f54f036, type: 2}
   - {fileID: 11400000, guid: 742f18cc88b42e446af7a7232f54f036, type: 2}
   - {fileID: 11400000, guid: 742f18cc88b42e446af7a7232f54f036, type: 2}
   - {fileID: 11400000, guid: cf726b8d3c130e34e829d6a9c9d067a6, type: 2}
+  - {fileID: 11400000, guid: cf726b8d3c130e34e829d6a9c9d067a6, type: 2}
+  - {fileID: 11400000, guid: cf726b8d3c130e34e829d6a9c9d067a6, type: 2}
   phantomPain: {fileID: 11400000, guid: 993cf03c107e65944a68bc0200c07050, type: 2}
+  initialCyberneticDeck: {fileID: 11400000, guid: af937152a10e142419c8f0fb0c90b1d7, type: 2}
   initialCybernetics:
   - {fileID: 11400000, guid: 230cf1632ca38a949a2d24a15c5dd002, type: 2}
   - {fileID: 11400000, guid: 0a9e9330f35baa64ba0c9a998bbfc7cd, type: 2}
   - {fileID: 11400000, guid: 21b7d59bce687164ebc31f84df95e936, type: 2}
   - {fileID: 11400000, guid: 88c1f43e9dbf7314cb15f327bae931a2, type: 2}
-  enemyHealth: 30
+  enemyHealth: 9999
   enemyAttackDamage: 6
   randomSeed: 1
   startOnPlay: 1

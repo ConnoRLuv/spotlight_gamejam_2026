@@ -27,12 +27,27 @@ namespace SpotlightGameJam
             Health = maxHealth; Sanity = maxSanity;
         }
         /// <summary>
-        /// 支付理智，可恰好扣到零；负费用、余额不足或角色死亡时拒绝。
+        /// 只读检查理智费用：存活且理智大于零时允许透支；零费用不要求拥有理智。
+        /// </summary>
+        public bool CanSpendSanity(int amount) => amount >= 0 && IsAlive && (amount == 0 || Sanity > 0);
+        /// <summary>
+        /// 支付理智，允许不足时扣至零，透支不扣生命或护盾；零理智拒绝正费用。
+        /// 幻痛加入及满手时的随机弃牌由战斗牌区处理。
         /// </summary>
         public bool TrySpendSanity(int amount)
         {
-            if (amount < 0 || amount > Sanity || !IsAlive) return false;
-            Sanity -= amount; Changed?.Invoke(this); return true;
+            if (!CanSpendSanity(amount)) return false;
+            int sanitySpent = Math.Min(Sanity, amount);
+            Sanity -= sanitySpent;
+            Changed?.Invoke(this); return true;
+        }
+        /// <summary>恢复理智但不超过上限；供后续商店和地图事件调用，零恢复量不触发变化。</summary>
+        public void RestoreSanity(int amount)
+        {
+            RequireNonNegative(amount);
+            if (!IsAlive || amount == 0 || Sanity == MaxSanity) return;
+            Sanity += Math.Min(amount, MaxSanity - Sanity);
+            Changed?.Invoke(this);
         }
         /// <summary>
         /// 恢复生命但不超过最大值；已死亡角色不会被此基础治疗复活。
