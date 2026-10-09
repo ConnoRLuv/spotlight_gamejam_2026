@@ -33,10 +33,10 @@ CardData 沿用原脚本和 GUID，保留全局类型及 cost/cardType 等字段
 | 攻击 | Basic | 1 | 0 | SingleEnemy | DamageEffectData，amount=6 |
 | 防御 | Basic | 1 | 0 | Self | ShieldEffectData，amount=3 |
 | 回复 | Basic | 1 | 0 | Self | HealEffectData，amount=3 |
-| 过载 | Function | 0 | 策划填写正数 | None | ActionPointEffectData，amount=1 |
+| 过载 | Function | 0 | 5 | None | ActionPointEffectData，amount=1 |
 | 义体测试牌 | Cybernetic | 0 | 策划填写正数 | Self | ShieldEffectData，amount=3 |
 
-功能牌和义体牌的理智费用必须为正数，AP 费用必须为 0。过载费用尚无策划数值，不提供静默默认值。
+功能牌和义体牌的理智费用必须为正数，AP 费用必须为 0。过载的理智费用已确认为 5。
 义体 cards 数组中的每个条目代表一张牌，可以重复引用同一 CardData 配置；每场战斗生成独立实例。
 `Assets/GameData` 已提供三张基本牌和四个军团义体的正式演示配置。
 
