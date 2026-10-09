@@ -66,7 +66,7 @@ namespace SpotlightGameJam.Editor
                 }
                 finally { UnityEngine.Object.DestroyImmediate(root); }
             }
-            // 增量追加映射和一张演示用过载，重复执行不增加副本或覆盖已有牌组。
+            // 增量追加映射；首次接入加入三张过载，已有牌组保留，重复执行不增加副本。
             if (!catalog.entries.Any(entry => entry != null && entry.data == data))
             {
                 catalog.entries = catalog.entries.Concat(new[] { new CardPrefabCatalog.Entry { data = data, prefab = prefab.GetComponent<CardView>() } }).ToArray();
@@ -77,8 +77,8 @@ namespace SpotlightGameJam.Editor
             for (int i = 0; i < deck.arraySize; i++) if (deck.GetArrayElementAtIndex(i).objectReferenceValue == data) exists = true;
             if (!exists)
             {
-                int index = deck.arraySize; deck.arraySize++;
-                deck.GetArrayElementAtIndex(index).objectReferenceValue = data;
+                int index = deck.arraySize; deck.arraySize += 3;
+                for (int i = index; i < deck.arraySize; i++) deck.GetArrayElementAtIndex(i).objectReferenceValue = data;
                 serialized.ApplyModifiedPropertiesWithoutUndo();
                 EditorSceneManager.MarkSceneDirty(scene); EditorSceneManager.SaveScene(scene);
             }

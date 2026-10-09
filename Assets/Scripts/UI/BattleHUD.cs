@@ -121,8 +121,8 @@ namespace SpotlightGameJam.UI
             {
                 var choices = battle.GetCyberneticChoices(card);
                 if (choices.Count == 0) { SetStatus("义体抽牌堆为空。"); return; }
-                if (battle.Context.Player.Sanity < card.Data.sanityCost || card.Source == null || card.Source.Durability <= 0 ||
-                    !battle.Context.Usage.CanUse(card.Source.Data.slot)) { SetStatus("理智不足，或来源义体当前不可用。"); return; }
+                if (!battle.Context.Player.CanSpendSanity(card.Data.sanityCost) || card.Source == null || card.Source.Durability <= 0 ||
+                    !battle.Context.Usage.CanUse(card.Source.Data.slot)) { SetStatus("理智为零，或来源义体当前不可用。"); return; }
                 pendingCard = card; choicePanel.SetActive(true);
                 foreach (var choice in choices)
                 {

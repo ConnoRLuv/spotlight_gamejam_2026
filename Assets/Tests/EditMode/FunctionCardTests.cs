@@ -46,22 +46,43 @@ namespace SpotlightGameJam.Tests
             }
         }
 
-        /// <summary>验证理智不足时过载失败，并保留卡牌和资源。</summary>
+        /// <summary>验证理智为零时过载失败，并保留卡牌和资源。</summary>
         [Test]
-        public void OverloadWithInsufficientSanityPreservesTheCardAndResources()
+        public void OverloadWithZeroSanityPreservesTheCardAndResources()
         {
             using (var assets = new TestAssets())
             {
                 var data = Overload(); var context = assets.Context(new[] { data });
                 Equip(context); TestAssets.Prepare(context);
-                context.Player.TrySpendSanity(context.Player.Sanity - data.sanityCost + 1);
-                int sanity = context.Player.Sanity; var card = context.Ordinary.Hand.Cards.Single();
+                var card = context.Ordinary.Hand.Cards.Single();
+                context.Player.TrySpendSanity(context.Player.Sanity);
+                int sanity = context.Player.Sanity;
+                var hand = context.Ordinary.Hand.Cards.ToArray();
                 var result = new CardPlayService().TryPlay(context, card);
                 Assert.That(result.Failure, Is.EqualTo(CardPlayFailure.InsufficientSanity));
                 Assert.That(context.Player.Sanity, Is.EqualTo(sanity));
                 Assert.That(context.ActionPoints.Total, Is.EqualTo(2));
-                Assert.That(context.Ordinary.Hand.Cards.Single(), Is.SameAs(card));
+                Assert.That(context.Ordinary.Hand.Cards, Is.EqualTo(hand));
+                Assert.That(context.HasPhantomPain, Is.True);
                 Assert.That(context.Ordinary.DiscardPile.Count, Is.Zero);
+            }
+        }
+
+        /// <summary>验证过载理智不足时可以透支，不扣生命并正常提供临时行动点。</summary>
+        [Test]
+        public void OverloadOverdraftPreservesHealthAndProvidesTemporaryAp()
+        {
+            using (var assets = new TestAssets())
+            {
+                var data = Overload(); var context = assets.Context(new[] { data });
+                Equip(context); TestAssets.Prepare(context);
+                context.Player.TrySpendSanity(46); context.Player.AddShield(3);
+                Assert.That(new CardPlayService().TryPlay(context, context.Ordinary.Hand.Cards.Single()).Success, Is.True);
+                Assert.That(context.Player.Health, Is.EqualTo(100));
+                Assert.That(context.Player.Sanity, Is.Zero);
+                Assert.That(context.Player.Shield, Is.EqualTo(3));
+                Assert.That(context.ActionPoints.Temporary, Is.EqualTo(1));
+                Assert.That(context.Ordinary.Hand.Cards.Single().Data, Is.SameAs(context.PhantomPain));
             }
         }
 

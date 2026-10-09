@@ -15,6 +15,9 @@ namespace SpotlightGameJam
         [SerializeField] private BattleRules rules;
         [SerializeField] private CardData[] ordinaryDeck = Array.Empty<CardData>();
         [SerializeField] private CardData phantomPain;
+        [Tooltip("可选：新冒险采用的义体牌组。为空时沿用下方 Initial Cybernetics；不会替换正在进行的冒险装备。")]
+        [SerializeField] private CyberneticDeckData initialCyberneticDeck;
+        [Tooltip("未选择义体牌组时使用的初始装备，也可用于自由混搭不同系列。")]
         [SerializeField] private CyberneticData[] initialCybernetics = Array.Empty<CyberneticData>();
         [SerializeField, Min(1)] private int enemyHealth = 30;
         [SerializeField, Min(0)] private int enemyAttackDamage = 6;
@@ -29,16 +32,24 @@ namespace SpotlightGameJam
         public event Action<BattleController> BattleCreated;
 
         private void Start() { if (startOnPlay) StartNewRun(); }
+        private void OnDestroy() { Battle?.Context.Dispose(); }
         /// <summary>
         /// 校验 Inspector 配置，创建新冒险及首场战斗；初始化成功后才替换公开引用。
         /// </summary>
         public bool StartNewRun()
         {
             if (Battle != null && Battle.Context.IsResolving) return Fail("当前仍在结算。");
-            if (initialCybernetics == null) return Fail("初始义体列表为空引用。");
-            var errors = ValidateEncounterConfiguration(initialCybernetics);
+            // 牌组只决定新冒险的初始装备；后续遭遇始终读取 Run 中的真实装备和耐久。
+            var selectedCybernetics = initialCyberneticDeck ? initialCyberneticDeck.cybernetics : initialCybernetics;
+            if (initialCyberneticDeck)
+            {
+                var deckErrors = initialCyberneticDeck.Validate();
+                if (deckErrors.Count > 0) return Fail(string.Join("\n", deckErrors));
+            }
+            if (selectedCybernetics == null) return Fail("初始义体列表为空引用。");
+            var errors = ValidateEncounterConfiguration(selectedCybernetics);
             var slots = new HashSet<CyberneticSlot>();
-            foreach (var data in initialCybernetics)
+            foreach (var data in selectedCybernetics)
             {
                 if (!data) errors.Add("初始义体含空引用。");
                 else
@@ -49,10 +60,11 @@ namespace SpotlightGameJam
             if (errors.Count > 0) return Fail(string.Join("\n",errors));
             // 用候选对象初始化，避免配置失败时覆盖现有冒险引用。
             var nextRun = new RunState(rules);
-            foreach (var data in initialCybernetics) nextRun.Loadout.Equip(new CyberneticInstance(data));
+            foreach (var data in selectedCybernetics) nextRun.Loadout.Equip(new CyberneticInstance(data));
             var candidate = CreateEncounter(nextRun,0);
-            if (!candidate.StartBattle()) return Fail(candidate.LastError);
+            if (!candidate.StartBattle()) { candidate.Context.Dispose(); return Fail(candidate.LastError); }
             // 首场启动成功后才发布新冒险；失败不会替换旧 Run/Battle。
+            Battle?.Context.Dispose();
             Run = nextRun; Battle = candidate; encounterIndex = 1; LastError = null;
             BattleCreated?.Invoke(Battle); return true;
         }
@@ -69,7 +81,8 @@ namespace SpotlightGameJam
             if (errors.Count > 0) return Fail(string.Join("\n",errors));
             // 下一场只替换战斗对象，继续引用同一个 RunState 中的持久状态。
             var candidate = CreateEncounter(Run,encounterIndex);
-            if (!candidate.StartBattle()) return Fail(candidate.LastError);
+            if (!candidate.StartBattle()) { candidate.Context.Dispose(); return Fail(candidate.LastError); }
+            Battle?.Context.Dispose();
             Battle = candidate; encounterIndex++; LastError = null;
             BattleCreated?.Invoke(Battle); return true;
         }
@@ -137,7 +150,7 @@ namespace SpotlightGameJam
             }
             var context = new BattleContext(run,rules,new[]{new CombatantState("enemy",enemyHealth)},
                 new CardDeck(rules.OrdinaryCapacity,ordinary,random),
-                new CardDeck(rules.CyberneticCapacity,run.Loadout.GetUsableCards(),random),
+                new CardDeck(rules.CyberneticCapacity,run.Loadout.GetUsableCards(),random, discardOverflow: true),
                 phantomPain,random);
             return new BattleController(context,enemyAttackDamage);
         }

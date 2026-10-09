@@ -56,7 +56,7 @@ namespace SpotlightGameJam.Editor
                     case 0:
                         // 抽完演示牌堆确保过载进入手牌，出牌仍通过实际 CardView/HUD 回调。
                         context.Ordinary.Draw(context.Ordinary.DrawPile.Count);
-                        played = context.Ordinary.Hand.Cards.Single(card => card.Data.cardId == "OverloadCard");
+                        played = context.Ordinary.Hand.Cards.First(card => card.Data.cardId == "OverloadCard");
                         context.ActionPoints.TrySpend(context.ActionPoints.Total); hud.ShowOrdinary();
                         var view = hud.GetComponentsInChildren<CardView>().Single(card => card.Instance == played);
                         Require(view.transform.Find("Source").GetComponent<Text>().text == "功能牌", "手牌分类显示错误。");
@@ -80,7 +80,7 @@ namespace SpotlightGameJam.Editor
                         var defense = context.Ordinary.Hand.Cards.First(card => card.Data.cardId == "DefenseCard");
                         hud.GetComponentsInChildren<CardView>().Single(card => card.Instance == defense).GetComponent<Button>().onClick.Invoke();
                         Require(context.Player.Shield == 3 && context.ActionPoints.Total == 0, "临时 AP 无法支付基本牌。");
-                        // 当前演示只有一张过载，移回手牌用于第二次真实出牌和过期检查。
+                        // 复用已验证的同一实例，检查再次出牌与过期，不依赖其他过载的抽取顺序。
                         Require(context.Ordinary.DiscardPile.TryRemove(played) && context.Ordinary.Hand.TryAdd(played), "测试牌重新入手失败。");
                         hud.ShowOrdinary();
                         hud.GetComponentsInChildren<CardView>().Single(card => card.Instance == played).GetComponent<Button>().onClick.Invoke();

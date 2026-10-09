@@ -63,8 +63,8 @@ namespace SpotlightGameJam
                 return Reject(CardPlayFailure.UnavailableCybernetic,"需要先装载义体才能使用该牌。");
             if (!context.ActionPoints.CanSpend(card.EffectiveApCost))
                 return Reject(CardPlayFailure.InsufficientAp,"行动点不足。");
-            if (context.Player.Sanity < card.Data.sanityCost)
-                return Reject(CardPlayFailure.InsufficientSanity,"理智不足。");
+            if (!context.Player.CanSpendSanity(card.Data.sanityCost))
+                return Reject(CardPlayFailure.InsufficientSanity,"理智为零，无法使用消耗理智的牌。");
             if (isCybernetic && (!context.IsUsableSource(card) || !context.Usage.CanUse(card.Source.Data.slot)))
                 return Reject(CardPlayFailure.UnavailableCybernetic,"来源义体未装备、已报废或超过使用限制。");
             var resolvedRequest = new CardPlayRequest(card, target, request.ChoiceId);
@@ -81,7 +81,7 @@ namespace SpotlightGameJam
             context.IsResolving = true;
             try
             {
-                // 先从手牌预留成功使用的牌，保证满手时幻痛不会把结算中的牌当作弃牌。
+                // 先移出成功使用的牌，为幻痛腾出位置；牌效执行期间不回收本牌。
                 deck.Hand.TryRemove(card);
                 context.ActionPoints.TrySpend(ap); context.Player.TrySpendSanity(sanity);
                 if (isCybernetic)
@@ -89,8 +89,10 @@ namespace SpotlightGameJam
                     context.Usage.RecordUse(card.Source.Data.slot); card.Source.TryConsumeDurability();
                     context.RecordUsedCyberneticCard(card);
                 }
-                // 理智支付到零时立即加入幻痛，同一张牌后续的伤害也受随机目标影响。
+                // 理智支付到零时同步唯一幻痛；普通满手则随机弃一张非锁定普通牌补入。
                 context.EnsurePhantomPain();
+                // 支付后同步胜负状态；透支仅扣理智，不影响生命，存活时正常执行牌效。
+                context.CheckOutcome();
                 foreach (var effect in effects)
                 {
                     // 致命伤害后不再执行回血、抽牌或加 AP 等剩余效果。

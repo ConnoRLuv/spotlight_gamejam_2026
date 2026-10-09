@@ -41,8 +41,14 @@ namespace SpotlightGameJam
         /// </summary>
         public bool TryRemove(CardInstance card)
         {
-            // 移牌、弃牌和出牌都经此约束，锁定牌不存在绕过检查的移出路径。
+            // 普通移牌、弃牌和出牌都经此约束；恢复理智清除幻痛走单独的内部规则入口。
             if (!Contains(card) || card.Data.locksInHand) return false;
+            cards.Remove(card); card.Zone = null; return true;
+        }
+        /// <summary>仅供规则系统在恢复理智时清除锁定牌，不对 UI 或普通移牌流程开放。</summary>
+        internal bool RemoveLockedCard(CardInstance card)
+        {
+            if (!Contains(card) || !card.Data.locksInHand) return false;
             cards.Remove(card); card.Zone = null; return true;
         }
         /// <summary>使用传入的随机源打乱牌区顺序。</summary>

@@ -15,7 +15,7 @@ MonoBehaviour:
   cardId: phantom-pain
   cardName: "\u5E7B\u75DB"
   artwork: {fileID: 0}
-  description: "\u65E0\u6CD5\u79BB\u5F00\u624B\u724C\u3002\n\u73A9\u5BB6\u9020\u6210\u7684\u4F24\u5BB3\u76EE\u6807\u968F\u673A\uFF0C\u5305\u542B\u73A9\u5BB6\u81EA\u8EAB\u3002"
+  description: "无法使用或弃置，占用普通手牌位置。\n跨战斗保留，理智恢复到大于 0 时移除。\n玩家造成的伤害目标随机，包含玩家自身。"
   cost: 0
   category: 3
   sanityCost: 0

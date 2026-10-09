@@ -50,7 +50,7 @@ namespace SpotlightGameJam.Tests
             using (var assets = new TestAssets())
             {
                 var context = Create(assets, out var card); var battle = new BattleController(context, 0); battle.StartBattle();
-                context.Player.TrySpendSanity(49);
+                context.Player.TrySpendSanity(50);
                 Assert.That(battle.TryPlay(card).Failure, Is.EqualTo(CardPlayFailure.InsufficientSanity));
                 Assert.That(Displayed(context, CyberneticSlot.Torso), Is.Null);
                 Assert.That(card.Source.Durability, Is.EqualTo(5));

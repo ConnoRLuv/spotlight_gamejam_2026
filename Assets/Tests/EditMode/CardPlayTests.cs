@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using NUnit.Framework;
 namespace SpotlightGameJam.Tests
 {
@@ -62,16 +63,16 @@ namespace SpotlightGameJam.Tests
             Assert.That(context.ActionPoints.Total, Is.EqualTo(2));
             Assert.That(context.Ordinary.Hand.Count, Is.EqualTo(1));
         }
-        /// <summary>验证行动点或理智不足时保留原手牌及资源。</summary>
-        [Test] public void InsufficientApAndSanityDoNotChangeHand()
+        /// <summary>验证行动点不足或理智为零时保留原手牌及资源。</summary>
+        [Test] public void InsufficientApAndZeroSanityDoNotChangeHand()
         {
             var data = assets.Card(assets.Create<HealEffectData>(),ap:3);
             var context = assets.Context(new[]{data}); TestAssets.Prepare(context);
             var card = context.Ordinary.Hand.Cards[0];
             Assert.That(service.TryPlay(context,card).Failure, Is.EqualTo(CardPlayFailure.InsufficientAp));
-            card.TemporaryApCost = 1; data.sanityCost = 51;
+            card.TemporaryApCost = 1; data.sanityCost = 51; context.Player.TrySpendSanity(50);
             Assert.That(service.TryPlay(context,card).Failure, Is.EqualTo(CardPlayFailure.InsufficientSanity));
-            Assert.That(context.Player.Sanity, Is.EqualTo(50));
+            Assert.That(context.Player.Sanity, Is.Zero);
             Assert.That(context.ActionPoints.Total, Is.EqualTo(2));
             Assert.That(context.Ordinary.Hand.Contains(card), Is.True);
         }
@@ -110,6 +111,72 @@ namespace SpotlightGameJam.Tests
             // Any direct player damage must use the same random resolver.
             for(int i=0;i<12;i++) DamageResolver.Apply(context,context.Player,context.Enemies[0],1);
             Assert.That(context.Player.Health, Is.LessThan(100));
+        }
+
+        /// <summary>验证义体透支不扣血，满手归零时只弃普通手牌，并立即补入唯一幻痛。</summary>
+        [Test]
+        public void CyberneticOverdraftReplacesOrdinaryCardWithPhantomImmediately()
+        {
+            var ordinary = assets.Card(assets.Create<HealEffectData>());
+            var context = assets.Context(System.Linq.Enumerable.Repeat(ordinary, 13).ToArray());
+            var data = assets.Card(assets.Create<ExtraTurnEffectData>(), CardTargetType.Self, CardCategory.Cybernetic, 0, 8);
+            var config = assets.Create<CyberneticData>(); config.cyberneticId = "overdraft-legs";
+            config.slot = CyberneticSlot.Legs; config.maxDurability = 3; config.cards = new[] { data };
+            var source = new CyberneticInstance(config); context.Run.Loadout.Equip(source);
+            var card = new CardInstance(data, source); context.Cybernetic.Hand.TryAdd(card);
+            TestAssets.Prepare(context); context.Ordinary.Draw(10);
+            context.Player.TrySpendSanity(46); context.Player.AddShield(10);
+            context.TurnEffects.DamageToSanityArmed = true;
+
+            Assert.That(service.TryPlay(context, card).Success, Is.True);
+            Assert.That(context.Player.Sanity, Is.Zero);
+            Assert.That(context.Player.Health, Is.EqualTo(100));
+            Assert.That(context.Player.Shield, Is.EqualTo(10));
+            Assert.That(context.Enemies[0].Health, Is.EqualTo(100));
+            Assert.That(context.TurnEffects.DamageToSanityArmed, Is.True, "费用不消耗承伤保护。");
+            Assert.That(context.TurnEffects.ExtraTurns, Is.EqualTo(1));
+            Assert.That(context.Usage.GetUses(CyberneticSlot.Legs), Is.EqualTo(1));
+            Assert.That(source.Durability, Is.EqualTo(2));
+            Assert.That(context.Cybernetic.DiscardPile.Contains(card), Is.True);
+            Assert.That(context.Ordinary.Hand.Count, Is.EqualTo(13));
+            Assert.That(context.HasPhantomPain, Is.True);
+            Assert.That(context.Ordinary.DiscardPile.Count, Is.EqualTo(1));
+            Assert.That(context.Ordinary.DiscardPile.Cards[0].Data, Is.SameAs(ordinary));
+            context.EnsurePhantomPain();
+            Assert.That(context.Ordinary.Hand.Count, Is.EqualTo(13));
+            Assert.That(context.Ordinary.DiscardPile.Count, Is.EqualTo(1));
+
+            context.Usage.BeginTurn(); context.Cybernetic.Hand.TryAdd(new CardInstance(data, source));
+            Assert.That(service.TryPlay(context, context.Cybernetic.Hand.Cards[0]).Failure, Is.EqualTo(CardPlayFailure.InsufficientSanity));
+            Assert.That(context.Player.Health, Is.EqualTo(100));
+            Assert.That(source.Durability, Is.EqualTo(2));
+            Assert.That(context.Usage.GetUses(CyberneticSlot.Legs), Is.EqualTo(1), "拒绝出牌不能增加本场累计次数。");
+            // 零理智仍可支付普通 AP，基础治疗可以正常使用。
+            Assert.That(service.TryPlay(context, System.Linq.Enumerable.First(context.Ordinary.Hand.Cards, value => value.Data == ordinary)).Success, Is.True);
+            Assert.That(context.Player.Health, Is.EqualTo(100));
+            Assert.That(context.Ordinary.Hand.Count, Is.EqualTo(12));
+            Assert.That(context.HasPhantomPain, Is.True);
+            Assert.That(context.Ordinary.Hand.Cards.Count(value => value.Data == context.PhantomPain), Is.EqualTo(1));
+        }
+
+        /// <summary>验证即使生命低于理智差额，透支也不扣血，后续治疗和行动点效果正常执行。</summary>
+        [Test]
+        public void SanityOverdraftAtLowHealthStillExecutesEffects()
+        {
+            var heal = assets.Create<HealEffectData>(); heal.amount = 100;
+            var data = assets.Card(heal, CardTargetType.Self, CardCategory.Function, 0, 8);
+            data.effects = new CardEffectData[] { heal, assets.Create<ActionPointEffectData>() };
+            var context = assets.Context(new[] { data }); TestAssets.Prepare(context);
+            context.Player.TrySpendSanity(49); context.Player.ReceiveDamage(97); context.Player.AddShield(10);
+            var card = context.Ordinary.Hand.Cards[0];
+            Assert.That(service.TryPlay(context, card).Success, Is.True);
+            Assert.That(context.Player.Health, Is.EqualTo(100));
+            Assert.That(context.Player.Sanity, Is.Zero);
+            Assert.That(context.Player.Shield, Is.EqualTo(10));
+            Assert.That(context.State, Is.EqualTo(BattleState.PlayerAction));
+            Assert.That(context.HasPhantomPain, Is.True);
+            Assert.That(context.ActionPoints.Temporary, Is.EqualTo(1));
+            Assert.That(context.Ordinary.DiscardPile.Contains(card), Is.True);
         }
         /// <summary>验证伤害仅选择存活参战者，并支持全体敌人目标。</summary>
         [Test] public void DamageSelectsOnlyAliveParticipantsAndAllEnemiesIsSupported()

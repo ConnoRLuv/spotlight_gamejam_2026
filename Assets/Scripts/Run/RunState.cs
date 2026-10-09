@@ -16,6 +16,8 @@ namespace SpotlightGameJam
         public CombatantState Player { get; }
         public CyberneticLoadout Loadout { get; } = new CyberneticLoadout();
         public int Gold { get; private set; }
+        // 普通冒险牌组中的唯一持久幻痛条目；战斗重建牌区时再次加入手牌，不写回共享资产。
+        public CardData PhantomPain { get; private set; }
         // 保存奖励配置，不保存上一场的牌实例；每场开战会创建全新的奖励手牌。
         public IReadOnlyList<CardData> InitialHandRewards => rewardView;
         /// <summary>根据规则创建冒险状态，跨战斗保存角色属性与义体装备。</summary>
@@ -23,7 +25,20 @@ namespace SpotlightGameJam
         {
             if (!rules || rules.Validate().Count > 0) throw new ArgumentException("战斗规则配置不合法。");
             Player = new CombatantState("player",rules.MaxHealth,rules.MaxSanity);
+            Player.Changed += OnPlayerChanged;
             rewardView = rewards.AsReadOnly();
+        }
+        /// <summary>登记冒险牌组中的唯一幻痛，跨战斗保留；恢复理智前不会因结束战斗而移除。</summary>
+        internal void AddPhantomPain(CardData data)
+        {
+            if (!data || !data.locksInHand || data.category != CardCategory.Special)
+                throw new ArgumentException("幻痛必须是锁定特殊牌。", nameof(data));
+            if (Player.Sanity == 0) PhantomPain = data;
+        }
+        /// <summary>理智恢复为正数时清除持久幻痛条目，包括两场战斗之间的地图阶段。</summary>
+        private void OnPlayerChanged(CombatantState player)
+        {
+            if (player.Sanity > 0) PhantomPain = null;
         }
         /// <summary>
         /// 加入非负金币奖励；不在此类中决定奖励数额。
