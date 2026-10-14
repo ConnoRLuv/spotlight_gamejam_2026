@@ -27,14 +27,34 @@ namespace SpotlightGameJam
         [SerializeField] private bool startOnPlay = true;
         // 用于生成下一场遭遇的种子；开启新冒险时从 0 重建。
         private int encounterIndex;
+        private AdventureSession adventure;
         public RunState Run { get; private set; }
         public BattleController Battle { get; private set; }
         public string LastError { get; private set; }
         // UI 获取新战斗时应解除旧 Context 订阅，再绑定新的战斗事件。
         public event Action<BattleController> BattleCreated;
 
-        private void Start() { if (startOnPlay) StartNewRun(); }
-        private void OnDestroy() { Battle?.Context.Dispose(); }
+        private void Start()
+        {
+            if (!startOnPlay) return;
+            if (AdventureSession.Instance && AdventureSession.Instance.Run != null) StartSessionEncounter();
+            else StartNewRun();
+        }
+        private void OnDestroy()
+        {
+            if (adventure) adventure.ReleaseEncounter(Battle);
+            else Battle?.Context.Dispose();
+        }
+        /// <summary>由探索入口接入战斗场景，读取跨场景状态，不使用场景内的初始牌组覆盖它。</summary>
+        public bool StartSessionEncounter()
+        {
+            var session = AdventureSession.Instance;
+            if (!session || !session.TryStartEncounter(enemyHealth, enemyAttackDamage))
+                return Fail(session ? session.LastError : "请先准备探索。");
+            Battle?.Context.Dispose(); adventure = session;
+            Run = session.Run; Battle = session.CurrentBattle; LastError = null;
+            BattleCreated?.Invoke(Battle); return true;
+        }
         /// <summary>
         /// 校验 Inspector 配置，创建新冒险及首场战斗；初始化成功后才替换公开引用。
         /// </summary>
@@ -70,8 +90,9 @@ namespace SpotlightGameJam
             var candidate = CreateEncounter(nextRun,0);
             if (!candidate.StartBattle()) { candidate.Context.Dispose(); return Fail(candidate.LastError); }
             // 首场启动成功后才发布新冒险；失败不会替换旧 Run/Battle。
+            if (adventure) adventure.ReleaseEncounter(Battle);
             Battle?.Context.Dispose();
-            Run = nextRun; Battle = candidate; encounterIndex = 1; LastError = null;
+            adventure = null; Run = nextRun; Battle = candidate; encounterIndex = 1; LastError = null;
             BattleCreated?.Invoke(Battle); return true;
         }
         /// <summary>
@@ -79,6 +100,7 @@ namespace SpotlightGameJam
         /// </summary>
         public bool StartEncounter()
         {
+            if (adventure && adventure.Run == Run) return StartSessionEncounter();
             if (Run == null) return Fail("请先开始冒险。");
             if (Battle != null && (Battle.Context.IsResolving || !Battle.Context.IsFinished))
                 return Fail("当前战斗尚未结束。");
