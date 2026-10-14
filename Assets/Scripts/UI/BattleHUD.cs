@@ -23,6 +23,7 @@ namespace SpotlightGameJam.UI
         [SerializeField] private Text statusText;
         [SerializeField] private Text[] durabilityTexts;
         [SerializeField] private DiscardPanel discardPanel;
+        [SerializeField] private DrawPilePanel drawPilePanel;
         [SerializeField] private CyberneticEquipmentSlot[] equipmentSlots = new CyberneticEquipmentSlot[0];
         private readonly List<CardView> handViews = new List<CardView>();
         private readonly List<CardView> choiceViews = new List<CardView>();
@@ -89,6 +90,7 @@ namespace SpotlightGameJam.UI
             Unbind(); battle = value; pendingCard = null; choicePanel.SetActive(false);
             battle.Context.Changed += OnBattleChanged;
             if (discardPanel) discardPanel.Bind(battle.Context);
+            if (drawPilePanel) drawPilePanel.Bind(battle.Context);
             Refresh();
         }
         /// <summary>解除战斗事件订阅并清空关联展示，避免引用上一场战斗。</summary>
@@ -96,6 +98,7 @@ namespace SpotlightGameJam.UI
         {
             if (battle != null) battle.Context.Changed -= OnBattleChanged;
             if (discardPanel) discardPanel.Bind(null);
+            if (drawPilePanel) drawPilePanel.Bind(null);
             foreach (var slot in equipmentSlots) if (slot) slot.Refresh(null);
             battle = null;
         }
@@ -111,6 +114,27 @@ namespace SpotlightGameJam.UI
         public void ShowOrdinary() { cybernetic = false; Refresh(); }
         /// <summary>切换到义体手牌页并刷新卡牌展示。</summary>
         public void ShowCybernetic() { cybernetic = true; Refresh(); }
+
+        /// <summary>由效果交互层显式打开抽牌堆；调用方负责费用，本方法只负责显示。</summary>
+        public void ShowDrawPile(float fadeSeconds = 0.15f)
+        {
+            if (!isActiveAndEnabled || battle == null || battle.Context.IsFinished || IsChoosing) return;
+            if (discardPanel) discardPanel.Hide(0);
+            if (drawPilePanel) drawPilePanel.Show(fadeSeconds);
+        }
+        /// <summary>由效果交互层显式打开弃牌堆，不绑定牌堆按钮或悬停事件。</summary>
+        public void ShowDiscardPile(float fadeSeconds = 0.15f)
+        {
+            if (!isActiveAndEnabled || battle == null || battle.Context.IsFinished || IsChoosing) return;
+            if (drawPilePanel) drawPilePanel.Hide(0);
+            if (discardPanel) discardPanel.Show(fadeSeconds);
+        }
+        /// <summary>关闭两个牌堆面板；默认淡出，生命周期清理可传零秒立即关闭。</summary>
+        public void ClosePilePanels(float fadeSeconds = 0.15f)
+        {
+            if (drawPilePanel) drawPilePanel.Hide(fadeSeconds);
+            if (discardPanel) discardPanel.Hide(fadeSeconds);
+        }
 
         /// <summary>自身牌直接提交；攻击等待敌人点击，脑机等待候选确认。</summary>
         public void SelectCard(CardInstance card)
@@ -182,7 +206,7 @@ namespace SpotlightGameJam.UI
             if (battle == null) return;
             var context = battle.Context;
             bool canAct = context.State == BattleState.PlayerAction && !context.IsFinished && !IsChoosing;
-            if (IsChoosing && discardPanel) discardPanel.Hide();
+            if (IsChoosing || context.IsFinished) ClosePilePanels(0);
             foreach (var slot in equipmentSlots)
             {
                 if (!slot) continue;
