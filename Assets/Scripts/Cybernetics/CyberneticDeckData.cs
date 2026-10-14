@@ -13,6 +13,8 @@ namespace SpotlightGameJam
         public string deckId;
         [Tooltip("供成员识别的系列或牌组名称。")]
         public string deckName;
+        [TextArea, Tooltip("旧版套装设计备注；实际触发条件及效果配置在 RunBuffData 中。")]
+        public string reservedSetBonusDescription;
         [Tooltip("本套初始义体，每个部位最多一个；可以只配置部分部位。各义体的 cards 数组决定入堆张数。")]
         public CyberneticData[] cybernetics = Array.Empty<CyberneticData>();
 

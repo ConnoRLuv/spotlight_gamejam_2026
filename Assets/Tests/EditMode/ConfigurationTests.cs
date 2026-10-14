@@ -50,7 +50,7 @@ namespace SpotlightGameJam.Tests
                 var brain = bootstrap.Run.Loadout.Get(CyberneticSlot.Brain);
                 Assert.That(brain.Data, Is.SameAs(selected));
                 Assert.That(bootstrap.Battle.Context.Cybernetic.AllCards.Count(), Is.EqualTo(3));
-                Assert.That(bootstrap.Battle.Context.Cybernetic.AllCards.All(instance => instance.Source == brain), Is.True);
+                Assert.That(bootstrap.Battle.Context.Cybernetic.AllCards.Select(instance => instance.Source).Distinct().Count(), Is.EqualTo(3));
 
                 // 新牌组只作用于新冒险；本次冒险继续携带已有装备及耐久。
                 brain.TryConsumeDurability();

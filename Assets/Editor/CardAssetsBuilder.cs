@@ -261,6 +261,7 @@ namespace SpotlightGameJam.Editor
             Set(serialized, "statusText", status); SetArray(serialized, "durabilityTexts", durabilityTexts.Cast<UnityEngine.Object>().ToArray());
             serialized.ApplyModifiedPropertiesWithoutUndo();
             references.playerHealthText.fontSize = 14;
+            CardChoicePanelBuilder.Upgrade(hud);
             FitSceneLayout();
             EditorSceneManager.SaveScene(scene);
         }

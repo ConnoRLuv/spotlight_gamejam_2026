@@ -19,6 +19,8 @@ namespace SpotlightGameJam
         public int EffectiveApCost => TemporaryApCost ?? Data.cost;
         // 转换生成的牌不会进入弃牌堆，也不会在玩家行动结束后继续存在。
         public bool ExpiresAtTurnEnd { get; }
+        // 奖励基本牌改造后应删除奖励条目，不能误删初始牌堆中同配置的另一张牌。
+        internal bool IsInitialHandReward { get; set; }
         /// <summary>创建具有独立身份的卡牌实例，记录配置及可选的来源义体。</summary>
         public CardInstance(CardData data, CyberneticInstance source = null, bool expiresAtTurnEnd = false)
         { Data = data ?? throw new ArgumentNullException(nameof(data)); Source = source; ExpiresAtTurnEnd = expiresAtTurnEnd; }

@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6e8393191f42de8498309ac019d7879b, type: 3}
+  m_Name: PrometheusTorso
+  m_EditorClassIdentifier: 
+  factionId: tian-qiong-legion
+  candidates:
+  - {fileID: 11400000, guid: 230cf1632ca38a949a2d24a15c5dd002, type: 2}
+  - {fileID: 11400000, guid: 0a9e9330f35baa64ba0c9a998bbfc7cd, type: 2}
+  - {fileID: 11400000, guid: 21b7d59bce687164ebc31f84df95e936, type: 2}
+  - {fileID: 11400000, guid: 88c1f43e9dbf7314cb15f327bae931a2, type: 2}
+  - {fileID: 11400000, guid: c9f2859fb7a6c2844a1adf5278db7519, type: 2}
+  - {fileID: 11400000, guid: 59389bece467fcd4ea32a0ddcafaf009, type: 2}
+  - {fileID: 11400000, guid: 9f3282cf1d61b3b45a59ea9da05ba3dd, type: 2}
+  - {fileID: 11400000, guid: c2953cfb253072848b0b1fce37c9a452, type: 2}

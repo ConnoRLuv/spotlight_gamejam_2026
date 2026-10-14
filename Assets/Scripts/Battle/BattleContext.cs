@@ -23,15 +23,26 @@ namespace SpotlightGameJam
         public ActionPointPool ActionPoints { get; } = new ActionPointPool();
         public CyberneticUsage Usage { get; }
         public BattleTurnEffects TurnEffects { get; } = new BattleTurnEffects();
+        /// <summary>获得实际 AP 费用，本回合免费效果只作用于基本牌，不修改共享配置。</summary>
+        public int GetEffectiveApCost(CardInstance card) =>
+            card != null && card.Data.category == CardCategory.Basic && TurnEffects.FreeBasicCards ? 0 : card?.EffectiveApCost ?? 0;
+        /// <summary>义体生命支付来自腿部效果，过载生命支付来自探索 buff；不修改共享配置。</summary>
+        public bool UsesHealthFor(CardInstance card) =>
+            card != null && (card.Data.category == CardCategory.Cybernetic && TurnEffects.CyberneticsPayHealth ||
+                card.Data.cardId == "OverloadCard" && Run.Buffs.Has(RunBuffEffect.OverloadPaysHealth));
+        /// <summary>只读检查费用余额，供 UI 和核心校验共用；不移动卡牌或扣资源。</summary>
+        public bool CanPayCardCost(CardInstance card) => card != null && ActionPoints.CanSpend(GetEffectiveApCost(card)) &&
+            (UsesHealthFor(card) ? Player.CanSpendHealth(card.Data.sanityCost) : Player.CanSpendSanity(card.Data.sanityCost));
         // 已成功使用的卡牌由本场战斗持有；不会因切换 UI 或新回合丢失，也不跨战斗复用。
         private readonly CardInstance[] usedCyberneticCards = new CardInstance[4];
         private int observedSanity;
-        /// <summary>获取对应部位本场最后成功使用的义体牌；未使用或来源装备已替换时为空。</summary>
+        private bool disposed;
+        /// <summary>获取对应部位本场最后成功使用的牌；展示不代表当前装备，也不影响 buff。</summary>
         public CardInstance GetUsedCyberneticCard(CyberneticSlot slot)
         {
             if (!Enum.IsDefined(typeof(CyberneticSlot), slot)) throw new ArgumentOutOfRangeException(nameof(slot));
             var card = usedCyberneticCards[(int)slot];
-            return card != null && Run.Loadout.Contains(card.Source) ? card : null;
+            return card != null && Run.Loadout.Owns(card.Source) ? card : null;
         }
         /// <summary>仅在成功支付义体牌费用之后记录，失败或等待选牌不能改变装备栏。</summary>
         internal void RecordUsedCyberneticCard(CardInstance card)
@@ -58,6 +69,7 @@ namespace SpotlightGameJam
             Usage = new CyberneticUsage(rules.UsesPerSlot);
             observedSanity = Player.Sanity;
             Player.Changed += OnPlayerChanged;
+            Run.Buffs.Changed += OnBuffChanged;
         }
         /// <summary>
         /// 切换阶段并通知订阅者；同一阶段不会重复触发事件。
@@ -66,7 +78,7 @@ namespace SpotlightGameJam
         {
             if (State == state) return;
             State = state;
-            if (IsFinished) { TurnEffects.Clear(); Ordinary.RemoveTurnCards(); Cybernetic.RemoveTurnCards(); }
+            if (IsFinished) { Run.Buffs.EndBattle(); TurnEffects.Clear(); Ordinary.RemoveTurnCards(); Cybernetic.RemoveTurnCards(); }
             StateChanged?.Invoke(state);
         }
         /// <summary>
@@ -99,7 +111,16 @@ namespace SpotlightGameJam
             if (!IsResolving) NotifyChanged();
         }
         /// <summary>解除持久玩家事件订阅，避免上一场战斗继续接收新战斗或地图的资源变化。</summary>
-        public void Dispose() => Player.Changed -= OnPlayerChanged;
+        public void Dispose()
+        {
+            // 会话和场景可能先后释放同一个旧上下文；重复清理不能影响新战斗的组合记录。
+            if (disposed) return;
+            disposed = true;
+            Player.Changed -= OnPlayerChanged; Run.Buffs.Changed -= OnBuffChanged;
+            if (State != BattleState.NotStarted && !IsFinished) Run.Buffs.EndBattle();
+        }
+        /// <summary>组合激活或过期后刷新费用，结算期间在操作结束时统一通知。</summary>
+        private void OnBuffChanged() { if (!IsResolving) NotifyChanged(); }
         /// <summary>
         /// 即时判断胜负；同时失去生存条件时优先判定玩家失败。
         /// </summary>
@@ -124,7 +145,7 @@ namespace SpotlightGameJam
                 if (card.Data.category != CardCategory.Basic && card.Data.category != CardCategory.Function)
                     errors.Add("普通牌堆只能包含基本牌和功能牌。");
             }
-            foreach (var instance in Run.Loadout.Equipped)
+            foreach (var instance in Run.Loadout.Owned)
             {
                 errors.AddRange(instance.Data.Validate());
             }
@@ -132,16 +153,16 @@ namespace SpotlightGameJam
             {
                 errors.AddRange(card.Data.Validate());
                 if (card.Data.category != CardCategory.Cybernetic || !IsUsableSource(card))
-                    errors.Add("义体牌必须属于已装备且有耐久的来源义体。");
+                    errors.Add("义体牌必须属于已持有且有耐久的来源义体。");
             }
             foreach (var reward in Run.InitialHandRewards) errors.AddRange(reward.Validate());
             return errors;
         }
         /// <summary>
-        /// 检查义体卡是否来自当前装备的真实实例，且来源有耐久并关联该卡配置。
+        /// 检查义体卡是否来自冒险持有的真实实例，且来源有耐久并关联该卡配置。
         /// </summary>
         internal bool IsUsableSource(CardInstance card) =>
-            card.Source != null && Run.Loadout.Contains(card.Source) && card.Source.Durability > 0 &&
+            card.Source != null && Run.Loadout.Owns(card.Source) && card.Source.Durability > 0 &&
             card.Source.Data.cards != null && card.Source.Data.cards.Contains(card.Data);
     }
 }

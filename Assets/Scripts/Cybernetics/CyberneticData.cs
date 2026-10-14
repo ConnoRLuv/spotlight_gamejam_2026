@@ -12,6 +12,8 @@ namespace SpotlightGameJam
     public sealed class CyberneticData : ScriptableObject
     {
         public string cyberneticId;
+        [Tooltip("义体所属阵营，用于同阵营改造候选筛选。")]
+        public string factionId = "tian-qiong-legion";
         public CyberneticSlot slot;
         [Min(1)] public int maxDurability = 3;
         // 可重复引用同一配置以表示多张牌；理智费用统一定义在各 CardData 中。
