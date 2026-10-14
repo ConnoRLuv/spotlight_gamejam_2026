@@ -34,31 +34,41 @@ namespace SpotlightGameJam
         /// <summary>
         /// 按堆顶顺序抽取指定数量，不按卡牌种类配额；堆空时重洗本套弃牌继续抽取。
         /// 返回实际加入手牌的新抽牌数量；普通满手停止，义体可启用溢出弃牌，两堆皆空则停止。
+        /// fromDiscardFirst 为 true 时先从本次弃牌快照随机取牌，不足再按原堆顶顺序补足。
         /// </summary>
-        public int Draw(int count)
+        public int Draw(int count, bool fromDiscardFirst = false)
         {
             if (count < 0) throw new ArgumentOutOfRangeException(nameof(count));
             if (!discardOverflow && Hand.Count >= Hand.Capacity) return 0;
             // 仅回收本次抽牌前的弃牌，避免溢出的牌在同一指令里被反复抽取。
-            var recyclable = DiscardPile.Cards.ToArray();
-            int attempts = Math.Min(count, DrawPile.Count + recyclable.Length);
+            var recyclable = DiscardPile.Cards.ToList();
+            int attempts = Math.Min(count, DrawPile.Count + recyclable.Count);
             int added = 0;
             for (int i = 0; i < attempts; i++)
             {
                 // 普通手牌满时连堆顶都不移出，也不触发洗牌或产生额外弃牌。
                 if (!discardOverflow && Hand.Count >= Hand.Capacity) break;
-                if (DrawPile.Count == 0)
+                CardInstance card;
+                if (fromDiscardFirst && recyclable.Count > 0)
                 {
-                    foreach (var discarded in recyclable)
-                        if (DiscardPile.TryRemove(discarded)) DrawPile.TryAdd(discarded);
-                    DrawPile.Shuffle(random);
-                    // 本次快照只回收一次，新产生的溢出弃牌留到后续抽牌指令。
-                    recyclable = Array.Empty<CardInstance>();
+                    // 从指令开始时的弃牌候选随机无放回抽取；溢出退回的牌不重复参与本指令。
+                    card = random.Choose(recyclable);
+                    recyclable.Remove(card); DiscardPile.TryRemove(card);
                 }
-                if (DrawPile.Count == 0) break;
-                // 列表尾部作为牌堆顶，移出后再加入手牌；归属由 CardZone 维护。
-                var card = DrawPile.Cards[DrawPile.Count - 1];
-                DrawPile.TryRemove(card);
+                else
+                {
+                    if (DrawPile.Count == 0)
+                    {
+                        foreach (var discarded in recyclable)
+                            if (DiscardPile.TryRemove(discarded)) DrawPile.TryAdd(discarded);
+                        DrawPile.Shuffle(random);
+                        recyclable.Clear();
+                    }
+                    if (DrawPile.Count == 0) break;
+                    // 列表尾部作为牌堆顶，移出后再加入手牌；归属由 CardZone 维护。
+                    card = DrawPile.Cards[DrawPile.Count - 1];
+                    DrawPile.TryRemove(card);
+                }
                 if (Hand.TryAdd(card)) added++;
                 // 抽到但放不下仍算一次抽牌尝试，防止满手时无限重抽。
                 else DiscardPile.TryAdd(card);

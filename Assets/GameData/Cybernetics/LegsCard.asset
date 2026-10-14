@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: LegsCard
   m_EditorClassIdentifier: 
   cyberneticId: LegsCard
+  factionId: tian-qiong-legion
   slot: 3
   maxDurability: 3
   cards:
