@@ -11,6 +11,15 @@ namespace SpotlightGameJam.Tests
     /// <summary>验证面板显隐契约和弃牌预览的真实资产，反射使缺失实现表现为断言失败。</summary>
     public sealed class PanelTests
     {
+        /// <summary>效果集成需要三个显式入口，玩家的悬停不负责打开牌堆。</summary>
+        [Test]
+        public void HudExposesExplicitPilePanelEntrypoints()
+        {
+            var hud = AppDomain.CurrentDomain.GetAssemblies().Select(assembly => assembly.GetType("SpotlightGameJam.UI.BattleHUD"))
+                .First(type => type != null);
+            foreach (var name in new[] { "ShowDrawPile", "ShowDiscardPile", "ClosePilePanels" })
+                Assert.That(hud.GetMethod(name), Is.Not.Null, name);
+        }
         /// <summary>查找 UI 程序集中的面板类型，供测试通过反射访问。</summary>
         private static Type PanelType()
         {
@@ -75,7 +84,10 @@ namespace SpotlightGameJam.Tests
                 type.GetMethod("Bind").Invoke(panel, new object[] { context });
                 type.GetMethod("Show").Invoke(panel, new object[] { 0f });
                 var displayed = (IEnumerable<CardInstance>)type.GetProperty("DisplayedCards").GetValue(panel);
-                Assert.That(displayed, Is.EqualTo(new[] { ordinary, cyber }));
+                Assert.That(displayed, Is.EqualTo(new[] { ordinary }));
+                type.GetMethod("ShowCybernetic").Invoke(panel, null);
+                displayed = (IEnumerable<CardInstance>)type.GetProperty("DisplayedCards").GetValue(panel);
+                Assert.That(displayed, Is.EqualTo(new[] { cyber }));
                 Assert.That(context.Ordinary.Hand.Count, Is.EqualTo(1), "展示不得移动牌。");
                 context.Ordinary.DiscardPile.TryRemove(ordinary);
                 type.GetMethod("Show").Invoke(panel, new object[] { 0f });
