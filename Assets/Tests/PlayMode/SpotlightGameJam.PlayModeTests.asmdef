@@ -1,0 +1,6 @@
+{
+  "name": "SpotlightGameJam.PlayModeTests",
+  "references": ["SpotlightGameJam.Runtime", "SpotlightGameJam.UI", "UnityEngine.UI"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "autoReferenced": false
+}

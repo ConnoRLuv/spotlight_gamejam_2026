@@ -248,7 +248,7 @@ namespace SpotlightGameJam.UI
                 if (IsChoosing) slot.HideTooltip();
             }
             scene.healthText.text = "生命 " + context.Player.Health;
-            scene.goldText.text = "金币 " + context.Run.Gold;
+            scene.goldText.text = "塞勒币 " + context.Run.Gold;
             scene.playerHealthText.text = context.Player.Health + "/" + context.Player.MaxHealth + "  护盾 " + context.Player.Shield;
             scene.sanityText.text = "理智值 " + context.Player.Sanity + "/" + context.Player.MaxSanity;
             var enemy = context.Enemies.FirstOrDefault();

@@ -2,7 +2,7 @@
 
 本文记录当前原型已实现的战斗规则和 BattleScene 配置，供策划、程序及其他成员查阅。尚未接入的地图、商店和事件单独列在文末，不视为当前可游玩的功能。
 
-规则更新日期：2026-10-14。Unity 版本：2022.3.62f3。配置界面：`Assets/Scenes/StartScene.unity`；战斗场景：`Assets/Scenes/BattleScene.unity`。出发只创建探索状态，不跳转场景，启动顺序保持原样。
+规则更新日期：2026-10-15。Unity 版本：2022.3.62f3。配置界面：`Assets/Scenes/StartScene.unity`；战斗场景：`Assets/Scenes/BattleScene.unity`。当前临时测试入口在出发后进入 BattleScene 并携带所选牌组，停用 `ExplorationBattleTestEntry` 可恢复只准备探索。项目启动顺序保持原样。
 
 ## 1. 初始属性与胜负
 

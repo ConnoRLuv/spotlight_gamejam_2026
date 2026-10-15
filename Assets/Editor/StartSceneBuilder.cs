@@ -26,6 +26,26 @@ namespace SpotlightGameJam.Editor
             RemoveDedicatedScene();
             AssetDatabase.SaveAssets();
         }
+        /// <summary>给当前开始场景接入可停用的临时战斗测试入口，保留既有 UI 和启动场景顺序。</summary>
+        [MenuItem("Spotlight/Start Scene/Enable Battle Test Entry")]
+        public static void EnableBattleTestEntry()
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode) throw new InvalidOperationException("请在编辑模式接入。");
+            var scene = SceneManager.GetActiveScene();
+            if (scene.path != ScenePath) throw new InvalidOperationException("请先打开 StartScene。");
+            var controller = scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<StartSceneController>(true)).Single();
+            WireBattleTestEntry(controller);
+            EditorSceneManager.MarkSceneDirty(scene); EditorSceneManager.SaveScene(scene);
+        }
+        /// <summary>复用或补齐测试组件，显式绑定出发事件来源；未来地图入口可独立替换。</summary>
+        private static void WireBattleTestEntry(StartSceneController controller)
+        {
+            var entry = controller.GetComponent<ExplorationBattleTestEntry>() ?? controller.gameObject.AddComponent<ExplorationBattleTestEntry>();
+            var fields = new SerializedObject(entry);
+            fields.FindProperty("source").objectReferenceValue = controller;
+            fields.FindProperty("battleScenePath").stringValue = "Assets/Scenes/BattleScene.unity";
+            fields.ApplyModifiedPropertiesWithoutUndo(); entry.enabled = true;
+        }
         /// <summary>复用 BattleScene 的普通牌、规则及幻痛，创建可配置的组合 buff。</summary>
         private static AdventureSetupData CreateSetup()
         {
@@ -120,6 +140,7 @@ namespace SpotlightGameJam.Editor
             var controller = canvas.gameObject.AddComponent<StartSceneController>();
             controller.Configure(setup,AssetDatabase.LoadAssetAtPath<CardPrefabCatalog>("Assets/GameData/CardPrefabCatalog.asset"),
                 parts,replace,unequip,clear,explore,settings,story,inventory,preview,title,info,summary,buffs,status);
+            WireBattleTestEntry(controller);
             Canvas.ForceUpdateCanvases(); EditorSceneManager.MarkSceneDirty(scene);
             if (!EditorSceneManager.SaveScene(scene,scenePath)) throw new InvalidOperationException("StartScene 保存失败。");
             referenceSizes.Clear();
