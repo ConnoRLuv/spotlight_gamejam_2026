@@ -37,7 +37,7 @@ namespace SpotlightGameJam
         }
         /// <summary>旧调试查询返回该部位的第一张持牌；战斗规则和 buff 不依赖此查询。</summary>
         public CyberneticInstance Get(CyberneticSlot slot) => cards.FirstOrDefault(value => value.Data.slot == slot);
-        /// <summary>改造仅增加一种未持有义体的一张满耐久牌，后续成功打出时可参与组合。</summary>
+        /// <summary>改造或购买增加一种未持有义体的一张满耐久持久牌，不替换同部位其他型号。</summary>
         public CardInstance AcquireCard(CyberneticData data, CardData card)
         {
             if (!data || data.Validate().Count > 0 || !data.cards.Contains(card) || OwnsConfiguration(data))

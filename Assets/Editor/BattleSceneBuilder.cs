@@ -78,7 +78,7 @@ namespace SpotlightGameJam.Editor
             references.healthText = Label(Panel(header.transform, "Health", new Rect(55, 22, 112, 55), DarkGray, true),
                 "Label", "生命值", 18, Color.white, font);
             references.goldText = Label(Panel(header.transform, "Gold", new Rect(186, 22, 112, 55), DarkGray, true),
-                "Label", "钱", 18, Color.white, font);
+                "Label", "塞勒币", 18, Color.white, font);
             references.mapProgressText = Label(Panel(header.transform, "MapProgress", new Rect(1253, 22, 548, 55), DarkGray, true),
                 "Label", "地图进度", 18, Color.white, font);
             references.settingsButton = Button(header.transform, "SettingsButton", new Rect(1820, 22, 55, 55),

@@ -16,6 +16,8 @@ namespace SpotlightGameJam
         public string factionId = "tian-qiong-legion";
         public CyberneticSlot slot;
         [Min(1)] public int maxDurability = 3;
+        [Tooltip("商店系列定价；未配置时禁止购买和修复，不影响战斗规则。")]
+        public CyberneticShopPriceData shopPricing;
         // 可重复引用同一配置以表示多张牌；理智费用统一定义在各 CardData 中。
         public CardData[] cards = new CardData[0];
         /// <summary>

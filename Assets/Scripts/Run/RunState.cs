@@ -38,6 +38,8 @@ namespace SpotlightGameJam
         public CyberneticLoadout Loadout { get; } = new CyberneticLoadout();
         public RunBuffState Buffs { get; }
         public int Gold { get; private set; }
+        /// <summary>塞勒币余额变化通知，供地图商店及顶部工具栏即时刷新。</summary>
+        public event Action<int> GoldChanged;
         // 普通冒险牌组中的唯一持久幻痛条目；战斗重建牌区时再次加入手牌，不写回共享资产。
         public CardData PhantomPain { get; private set; }
         // 保存奖励配置，不保存上一场的牌实例；每场开战会创建全新的奖励手牌。
@@ -70,12 +72,18 @@ namespace SpotlightGameJam
         {
             if (amount < 0) throw new ArgumentOutOfRangeException(nameof(amount));
             Gold = checked(Gold + amount);
+            if (amount > 0) GoldChanged?.Invoke(Gold);
         }
         /// <summary>
         /// 尝试消费金币；余额不足或费用为负时不修改金币。
         /// </summary>
         public bool TrySpendGold(int amount)
-        { if (amount < 0 || amount > Gold) return false; Gold -= amount; return true; }
+        {
+            if (amount < 0 || amount > Gold) return false;
+            Gold -= amount;
+            if (amount > 0) GoldChanged?.Invoke(Gold);
+            return true;
+        }
         /// <summary>
         /// 登记后续每场战斗的初始基本牌奖励；这里只记录配置，开战时生成实例。
         /// </summary>
