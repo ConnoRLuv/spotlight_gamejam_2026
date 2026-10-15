@@ -19,10 +19,14 @@ namespace SpotlightGameJam.UI
         [SerializeField] private Button enemyButton;
         [SerializeField] private GameObject choicePanel;
         [SerializeField] private RectTransform choicesRoot;
+        [SerializeField] private Text choiceTitle;
+        [SerializeField] private Text choiceHint;
+        [SerializeField] private ScrollRect choiceScroll;
         [SerializeField] private Button cancelChoiceButton;
         [SerializeField] private Text statusText;
         [SerializeField] private Text[] durabilityTexts;
         [SerializeField] private DiscardPanel discardPanel;
+        [SerializeField] private DrawPilePanel drawPilePanel;
         [SerializeField] private CyberneticEquipmentSlot[] equipmentSlots = new CyberneticEquipmentSlot[0];
         private readonly List<CardView> handViews = new List<CardView>();
         private readonly List<CardView> choiceViews = new List<CardView>();
@@ -72,6 +76,28 @@ namespace SpotlightGameJam.UI
             // 窗口尺寸改变时只调整现有展示，不重新生成整手牌。
             if (handScroll && handScroll.viewport && Mathf.Abs(lastViewportHeight - handScroll.viewport.rect.height) > 0.1f)
                 UpdateCardScale();
+            if (IsChoosing) UpdateChoiceLayout();
+        }
+        /// <summary>选牌窗口限制在画布内，按视口宽度调整列数，卡牌始终由裁剪列表承载。</summary>
+        private void UpdateChoiceLayout()
+        {
+            if (!choiceScroll || !choiceScroll.viewport || !choicesRoot) return;
+            var window = choiceScroll.transform.parent as RectTransform;
+            var overlay = window ? window.parent as RectTransform : null;
+            if (overlay)
+            {
+                float width = Mathf.Min(1000, Mathf.Max(300, overlay.rect.width - 48));
+                float height = Mathf.Min(760, Mathf.Max(300, overlay.rect.height - 48));
+                if (!Mathf.Approximately(window.rect.width, width)) window.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, width);
+                if (!Mathf.Approximately(window.rect.height, height)) window.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, height);
+            }
+            var grid = choicesRoot.GetComponent<GridLayoutGroup>();
+            if (grid)
+            {
+                int columns = Mathf.Clamp(Mathf.FloorToInt((choiceScroll.viewport.rect.width - grid.padding.horizontal + grid.spacing.x) /
+                    (grid.cellSize.x + grid.spacing.x)), 1, 3);
+                if (grid.constraintCount != columns) grid.constraintCount = columns;
+            }
         }
         /// <summary>根据手牌视口高度等比缩放现有卡面，并请求重新布局。</summary>
         private void UpdateCardScale()
@@ -89,6 +115,7 @@ namespace SpotlightGameJam.UI
             Unbind(); battle = value; pendingCard = null; choicePanel.SetActive(false);
             battle.Context.Changed += OnBattleChanged;
             if (discardPanel) discardPanel.Bind(battle.Context);
+            if (drawPilePanel) drawPilePanel.Bind(battle.Context);
             Refresh();
         }
         /// <summary>解除战斗事件订阅并清空关联展示，避免引用上一场战斗。</summary>
@@ -96,6 +123,7 @@ namespace SpotlightGameJam.UI
         {
             if (battle != null) battle.Context.Changed -= OnBattleChanged;
             if (discardPanel) discardPanel.Bind(null);
+            if (drawPilePanel) drawPilePanel.Bind(null);
             foreach (var slot in equipmentSlots) if (slot) slot.Refresh(null);
             battle = null;
         }
@@ -112,25 +140,55 @@ namespace SpotlightGameJam.UI
         /// <summary>切换到义体手牌页并刷新卡牌展示。</summary>
         public void ShowCybernetic() { cybernetic = true; Refresh(); }
 
-        /// <summary>自身牌直接提交；攻击等待敌人点击，脑机等待候选确认。</summary>
+        /// <summary>由效果交互层显式打开抽牌堆；调用方负责费用，本方法只负责显示。</summary>
+        public void ShowDrawPile(float fadeSeconds = 0.15f)
+        {
+            if (!isActiveAndEnabled || battle == null || battle.Context.IsFinished || IsChoosing) return;
+            if (discardPanel) discardPanel.Hide(0);
+            if (drawPilePanel) drawPilePanel.Show(fadeSeconds);
+        }
+        /// <summary>由效果交互层显式打开弃牌堆，不绑定牌堆按钮或悬停事件。</summary>
+        public void ShowDiscardPile(float fadeSeconds = 0.15f)
+        {
+            if (!isActiveAndEnabled || battle == null || battle.Context.IsFinished || IsChoosing) return;
+            if (drawPilePanel) drawPilePanel.Hide(0);
+            if (discardPanel) discardPanel.Show(fadeSeconds);
+        }
+        /// <summary>关闭两个牌堆面板；默认淡出，生命周期清理可传零秒立即关闭。</summary>
+        public void ClosePilePanels(float fadeSeconds = 0.15f)
+        {
+            if (drawPilePanel) drawPilePanel.Hide(fadeSeconds);
+            if (discardPanel) discardPanel.Hide(fadeSeconds);
+        }
+
+        /// <summary>自身牌直接提交；攻击等待敌人点击，交互牌统一等待候选确认。</summary>
         public void SelectCard(CardInstance card)
         {
             if (battle == null || battle.Context.IsFinished || IsChoosing || card == null || card.Data.locksInHand) return;
             CancelSelection();
             if (card.Data.effects.Any(effect => effect.RequiresChoice))
             {
-                var choices = battle.GetCyberneticChoices(card);
-                if (choices.Count == 0) { SetStatus("义体抽牌堆为空。"); return; }
-                if (!battle.Context.Player.CanSpendSanity(card.Data.sanityCost) || card.Source == null || card.Source.Durability <= 0 ||
-                    !battle.Context.Usage.CanUse(card.Source.Data.slot)) { SetStatus("理智为零，或来源义体当前不可用。"); return; }
+                var context = battle.Context;
+                if (!context.CanPayCardCost(card)) { SetStatus("当前资源不足以支付卡牌费用。"); return; }
+                if (card.Data.category == CardCategory.Cybernetic &&
+                    (card.Source == null || !context.Run.Loadout.Owns(card.Source) || card.Source.Durability <= 0 ||
+                    !context.Usage.CanUse(card.Source.Data.slot))) { SetStatus("来源义体当前不可用。"); return; }
+                // 控制器决定候选来源，既支持脑机查看牌堆，也支持改造当前基本手牌。
+                var choices = battle.GetCardChoices(card);
+                if (choices.Count == 0) { SetStatus("当前没有可选择的卡牌。"); return; }
                 pendingCard = card; choicePanel.SetActive(true);
+                if (choiceTitle) choiceTitle.text = battle.GetCardChoiceTitle(card);
+                if (choiceHint) choiceHint.text = battle.GetCardChoicePrompt(card);
                 foreach (var choice in choices)
                 {
                     var view = Instantiate(catalog.Find(choice.Data), choicesRoot);
-                    view.Bind(choice); view.SetInteractable(true); view.Selected += ConfirmChoice;
+                    view.BindForBattle(choice, context); view.SetInteractable(true); view.Selected += ConfirmChoice;
                     choiceViews.Add(view);
                 }
-                SetStatus("选择一张义体牌；取消不消耗资源。"); Refresh();
+                UpdateChoiceLayout();
+                LayoutRebuilder.ForceRebuildLayoutImmediate(choicesRoot);
+                if (choiceScroll) { choiceScroll.StopMovement(); choiceScroll.verticalNormalizedPosition = 1; }
+                SetStatus(battle.GetCardChoicePrompt(card)); Refresh();
             }
             else if (card.Data.targetType == CardTargetType.SingleEnemy)
             { pendingCard = card; SetStatus("点击敌人确认攻击；Esc 取消。"); }
@@ -182,7 +240,7 @@ namespace SpotlightGameJam.UI
             if (battle == null) return;
             var context = battle.Context;
             bool canAct = context.State == BattleState.PlayerAction && !context.IsFinished && !IsChoosing;
-            if (IsChoosing && discardPanel) discardPanel.Hide();
+            if (IsChoosing || context.IsFinished) ClosePilePanels(0);
             foreach (var slot in equipmentSlots)
             {
                 if (!slot) continue;
@@ -206,10 +264,10 @@ namespace SpotlightGameJam.UI
             conversionButton.interactable = canAct && context.ActionPoints.Total >= 1 && context.Ordinary.Hand.Count < context.Ordinary.Hand.Capacity;
             for (int i = 0; i < durabilityTexts.Length; i++)
             {
-                var slot = (CyberneticSlot)i; var equipped = context.Run.Loadout.Get(slot);
+                var slot = (CyberneticSlot)i; var used = context.GetUsedCyberneticCard(slot); var source = used?.Source;
                 // 兼容旧场景引用；新场景由 EquipmentSlot 展示完整卡面和名称。
-                durabilityTexts[i].text = context.GetUsedCyberneticCard(slot) == null ? "" :
-                    new[] { "脑机", "躯干", "手部", "腿部" }[i] + "\n耐久 " + (equipped?.Durability ?? 0) + "/" + (equipped?.Data.maxDurability ?? 0)
+                durabilityTexts[i].text = used == null ? "" :
+                    new[] { "脑机", "躯干", "手部", "腿部" }[i] + "\n耐久 " + source.Durability + "/" + source.Data.maxDurability
                     + "\n使用 " + context.Usage.GetUses(slot) + "/3";
             }
             ClearViews(handViews);
@@ -218,7 +276,7 @@ namespace SpotlightGameJam.UI
                 var view = Instantiate(catalog.Find(card.Data), cardsRoot);
                 // 手牌区保留参考图位置；缩放卡牌以为标签栏留出空间。
                 view.transform.localScale = Vector3.one * (6f / 7f);
-                view.Bind(card); view.SetInteractable(canAct); view.Selected += SelectCard;
+                view.BindForBattle(card, context); view.SetInteractable(canAct); view.Selected += SelectCard;
                 handViews.Add(view);
             }
             if (handScroll) handScroll.horizontalNormalizedPosition = 0;

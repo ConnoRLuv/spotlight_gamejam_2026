@@ -16,6 +16,7 @@ namespace SpotlightGameJam.UI
         [SerializeField] private Text costText;
         [SerializeField] private Text descriptionText;
         [SerializeField] private Text sourceText;
+        private BattleContext context;
         public CardData Data => Instance?.Data ?? cardData;
         public CardInstance Instance { get; private set; }
         public event Action<CardInstance> Selected;
@@ -29,8 +30,12 @@ namespace SpotlightGameJam.UI
             descriptionText = description; sourceText = source; Refresh();
         }
 
-        /// <summary>绑定真实实例；不构造来源义体，也不写入共享费用。</summary>
-        public void Bind(CardInstance instance) { Instance = instance; Refresh(); }
+        /// <summary>绑定只读实例并解除战斗费用覆盖，供弃牌预览和装备展示使用。</summary>
+        public void Bind(CardInstance instance) { Instance = instance; context = null; Refresh(); }
+
+        /// <summary>绑定真实实例和战斗状态，按当前效果显示费用，不写入共享配置。</summary>
+        public void BindForBattle(CardInstance instance, BattleContext battleContext)
+        { Instance = instance; context = battleContext; Refresh(); }
 
         /// <summary>设置卡面的按钮可交互状态，用于手牌与只读预览复用。</summary>
         public void SetInteractable(bool value) { if (button) button.interactable = value && Data && !Data.locksInHand; }
@@ -41,14 +46,21 @@ namespace SpotlightGameJam.UI
         /// <summary>转发卡面点击事件，由调用方决定出牌或选牌行为。</summary>
         private void HandleClick() { if (Instance != null) Selected?.Invoke(Instance); }
 
-        /// <summary>费用覆盖、生成牌寿命和来源耐久均从实例读取；幻痛使用中性灰色。</summary>
+        /// <summary>费用从战斗权威状态读取，生成牌寿命和耐久从实例读取；幻痛使用中性灰色。</summary>
         public void Refresh()
         {
             var data = Data;
             if (!data) return;
             if (background) background.color = data.category == CardCategory.Special ? new Color(0.65f, 0.65f, 0.65f) : tint;
             if (nameText) nameText.text = data.cardName;
-            if (costText) costText.text = data.sanityCost > 0 ? "理智 " + data.sanityCost : "AP " + (Instance?.EffectiveApCost ?? data.cost);
+            if (costText)
+            {
+                // 同一个费用判定服务于卡面和出牌结算，探索 buff 失效后费用立即恢复。
+                if (data.sanityCost > 0)
+                    costText.text = (context != null && Instance != null && context.UsesHealthFor(Instance) ? "生命 " : "理智 ") + data.sanityCost;
+                else
+                    costText.text = "AP " + (context != null && Instance != null ? context.GetEffectiveApCost(Instance) : Instance?.EffectiveApCost ?? data.cost);
+            }
             if (descriptionText) descriptionText.text = data.description;
             if (sourceText)
             {

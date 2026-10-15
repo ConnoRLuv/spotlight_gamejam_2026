@@ -17,6 +17,8 @@ namespace SpotlightGameJam
         [SerializeField] private CardData phantomPain;
         [Tooltip("可选：新冒险采用的义体牌组。为空时沿用下方 Initial Cybernetics；不会替换正在进行的冒险装备。")]
         [SerializeField] private CyberneticDeckData initialCyberneticDeck;
+        [Tooltip("直接运行战斗场景时可触发的组合 Buff；已有探索会话仍使用会话内配置。")]
+        [SerializeField] private RunBuffData[] runBuffs = Array.Empty<RunBuffData>();
         [Tooltip("未选择义体牌组时使用的初始装备，也可用于自由混搭不同系列。")]
         [SerializeField] private CyberneticData[] initialCybernetics = Array.Empty<CyberneticData>();
         [SerializeField, Min(1)] private int enemyHealth = 30;
@@ -25,14 +27,34 @@ namespace SpotlightGameJam
         [SerializeField] private bool startOnPlay = true;
         // 用于生成下一场遭遇的种子；开启新冒险时从 0 重建。
         private int encounterIndex;
+        private AdventureSession adventure;
         public RunState Run { get; private set; }
         public BattleController Battle { get; private set; }
         public string LastError { get; private set; }
         // UI 获取新战斗时应解除旧 Context 订阅，再绑定新的战斗事件。
         public event Action<BattleController> BattleCreated;
 
-        private void Start() { if (startOnPlay) StartNewRun(); }
-        private void OnDestroy() { Battle?.Context.Dispose(); }
+        private void Start()
+        {
+            if (!startOnPlay) return;
+            if (AdventureSession.Instance && AdventureSession.Instance.Run != null) StartSessionEncounter();
+            else StartNewRun();
+        }
+        private void OnDestroy()
+        {
+            if (adventure) adventure.ReleaseEncounter(Battle);
+            else Battle?.Context.Dispose();
+        }
+        /// <summary>由探索入口接入战斗场景，读取跨场景状态，不使用场景内的初始牌组覆盖它。</summary>
+        public bool StartSessionEncounter()
+        {
+            var session = AdventureSession.Instance;
+            if (!session || !session.TryStartEncounter(enemyHealth, enemyAttackDamage))
+                return Fail(session ? session.LastError : "请先准备探索。");
+            Battle?.Context.Dispose(); adventure = session;
+            Run = session.Run; Battle = session.CurrentBattle; LastError = null;
+            BattleCreated?.Invoke(Battle); return true;
+        }
         /// <summary>
         /// 校验 Inspector 配置，创建新冒险及首场战斗；初始化成功后才替换公开引用。
         /// </summary>
@@ -48,6 +70,8 @@ namespace SpotlightGameJam
             }
             if (selectedCybernetics == null) return Fail("初始义体列表为空引用。");
             var errors = ValidateEncounterConfiguration(selectedCybernetics);
+            foreach (var buff in runBuffs ?? Array.Empty<RunBuffData>())
+                if (!buff) errors.Add("组合 Buff 含空引用。"); else errors.AddRange(buff.Validate());
             var slots = new HashSet<CyberneticSlot>();
             foreach (var data in selectedCybernetics)
             {
@@ -60,12 +84,15 @@ namespace SpotlightGameJam
             if (errors.Count > 0) return Fail(string.Join("\n",errors));
             // 用候选对象初始化，避免配置失败时覆盖现有冒险引用。
             var nextRun = new RunState(rules);
-            foreach (var data in selectedCybernetics) nextRun.Loadout.Equip(new CyberneticInstance(data));
+            foreach (var data in selectedCybernetics) nextRun.Loadout.AddInitial(data);
+            // 独立测试场景也配置组合定义；配置本身不会激活，仍需同回合成功打出四部位。
+            nextRun.Buffs.Configure(runBuffs);
             var candidate = CreateEncounter(nextRun,0);
             if (!candidate.StartBattle()) { candidate.Context.Dispose(); return Fail(candidate.LastError); }
             // 首场启动成功后才发布新冒险；失败不会替换旧 Run/Battle。
+            if (adventure) adventure.ReleaseEncounter(Battle);
             Battle?.Context.Dispose();
-            Run = nextRun; Battle = candidate; encounterIndex = 1; LastError = null;
+            adventure = null; Run = nextRun; Battle = candidate; encounterIndex = 1; LastError = null;
             BattleCreated?.Invoke(Battle); return true;
         }
         /// <summary>
@@ -73,11 +100,12 @@ namespace SpotlightGameJam
         /// </summary>
         public bool StartEncounter()
         {
+            if (adventure && adventure.Run == Run) return StartSessionEncounter();
             if (Run == null) return Fail("请先开始冒险。");
             if (Battle != null && (Battle.Context.IsResolving || !Battle.Context.IsFinished))
                 return Fail("当前战斗尚未结束。");
             if (!Run.Player.IsAlive) return Fail("玩家已经死亡，请开始新冒险。");
-            var errors = ValidateEncounterConfiguration(Run.Loadout.Equipped.Select(instance => instance.Data));
+            var errors = ValidateEncounterConfiguration(Run.Loadout.Owned.Select(instance => instance.Data));
             if (errors.Count > 0) return Fail(string.Join("\n",errors));
             // 下一场只替换战斗对象，继续引用同一个 RunState 中的持久状态。
             var candidate = CreateEncounter(Run,encounterIndex);
@@ -141,8 +169,8 @@ namespace SpotlightGameJam
             // 固定种子加遭遇序号，方便复现相同冒险中每一场的随机过程。
             var random = new RandomUtility(unchecked(randomSeed + index));
             var ordinary = new List<CardInstance>();
-            bool hasCybernetic = run.Loadout.Equipped.Any();
-            foreach (var data in ordinaryDeck)
+            bool hasCybernetic = run.Loadout.Owned.Count > 0;
+            foreach (var data in run.ApplyOrdinaryTransformations(ordinaryDeck))
             {
                 // 初始牌组保留静态配置，构建遭遇时按当前装备筛选已解锁的牌。
                 if (data.requiresEquippedCybernetic && !hasCybernetic) continue;

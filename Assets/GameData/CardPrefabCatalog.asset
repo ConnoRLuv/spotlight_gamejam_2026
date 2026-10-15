@@ -29,4 +29,12 @@ MonoBehaviour:
     prefab: {fileID: 2641263599415619350, guid: fec7e81c150696341957947cd043efcd, type: 3}
   - data: {fileID: 11400000, guid: cf726b8d3c130e34e829d6a9c9d067a6, type: 2}
     prefab: {fileID: 8168565677005454170, guid: 82b0670be572b0d4ea8bb429ad953bcb, type: 3}
+  - data: {fileID: 11400000, guid: 505a2ef291f922e4b87878ed373d8159, type: 2}
+    prefab: {fileID: 1945374114131642470, guid: d1af325e55c99d14abfceac1c66e6abd, type: 3}
+  - data: {fileID: 11400000, guid: 12862b5e27a59f24c9082145fd88001d, type: 2}
+    prefab: {fileID: 511116939943096364, guid: fd20403983b239a478973b76fc766d40, type: 3}
+  - data: {fileID: 11400000, guid: 03223ba0d643c034ca6a26b02a5106b0, type: 2}
+    prefab: {fileID: 4365898551878779629, guid: 824c064b0cec16c4e9b72fffd4ba88d9, type: 3}
+  - data: {fileID: 11400000, guid: 9c9aa71eff069eb458e94c36a71afebf, type: 2}
+    prefab: {fileID: 7512205168940564721, guid: eab209677a9d03440ab640f91586adc2, type: 3}
   fallback: {fileID: 7615526685617310273, guid: d4e2b7c2b3085124d9c6b02dc94aec44, type: 3}

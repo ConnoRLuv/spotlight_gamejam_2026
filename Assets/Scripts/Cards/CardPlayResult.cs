@@ -10,7 +10,7 @@ namespace SpotlightGameJam
     {
         None, InvalidPhase, Busy, CardNotInHand, LockedCard, InvalidConfiguration,
         InvalidTarget, InsufficientAp, InsufficientSanity, UnavailableCybernetic,
-        ChoiceRequired, InvalidChoice, HandFull, EffectUnavailable
+        ChoiceRequired, InvalidChoice, HandFull, EffectUnavailable, InsufficientHealth
     }
     /// <summary>
     /// 携带一次出牌指令的结果，包含是否成功、失败类型和可读提示。

@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: TorsoCard
   m_EditorClassIdentifier: 
   cyberneticId: TorsoCard
+  factionId: tian-qiong-legion
   slot: 1
   maxDurability: 5
   cards:

@@ -49,6 +49,22 @@ namespace SpotlightGameJam
             Sanity += Math.Min(amount, MaxSanity - Sanity);
             Changed?.Invoke(this);
         }
+        /// <summary>检查生命费用，支付后必须保留至少一点生命；不要求当前拥有理智。</summary>
+        public bool CanSpendHealth(int amount) => amount >= 0 && IsAlive && Health > amount;
+        /// <summary>单独支付生命费用，绕过护盾及伤害替换，不附带理智回复。</summary>
+        public bool TrySpendHealth(int amount)
+        {
+            if (!CanSpendHealth(amount)) return false;
+            Health -= amount; Changed?.Invoke(this); return true;
+        }
+        /// <summary>直接支付生命并恢复等量理智，绕过护盾和伤害效果，统一通知最终资源。</summary>
+        public bool TrySpendHealthAndRestoreSanity(int amount)
+        {
+            if (!CanSpendHealth(amount)) return false;
+            Health -= amount;
+            Sanity += Math.Min(amount, MaxSanity - Sanity);
+            Changed?.Invoke(this); return true;
+        }
         /// <summary>
         /// 恢复生命但不超过最大值；已死亡角色不会被此基础治疗复活。
         /// </summary>

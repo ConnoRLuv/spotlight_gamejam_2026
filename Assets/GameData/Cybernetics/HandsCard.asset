@@ -13,6 +13,7 @@ MonoBehaviour:
   m_Name: HandsCard
   m_EditorClassIdentifier: 
   cyberneticId: HandsCard
+  factionId: tian-qiong-legion
   slot: 2
   maxDurability: 3
   cards:
