@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 namespace SpotlightGameJam
 {
     /// <summary>
@@ -20,6 +20,7 @@ namespace SpotlightGameJam
             context.SetState(BattleState.TurnStart);
             TurnNumber++;
             context.TurnEffects.BeginTurn();
+            context.SetNoHandLimit(false);
             // 在玩家回合开始清除，保证上一回合防御可先抵挡敌人行动。
             context.Player.ClearShield();
             foreach (var enemy in context.Enemies) enemy.ClearShield();

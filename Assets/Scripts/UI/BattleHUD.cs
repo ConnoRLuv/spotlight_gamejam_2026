@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
@@ -23,6 +23,11 @@ namespace SpotlightGameJam.UI
         [SerializeField] private Text statusText;
         [SerializeField] private Text[] durabilityTexts;
         [SerializeField] private DiscardPanel discardPanel;
+<<<<<<< Updated upstream
+=======
+        [SerializeField] private DrawPilePanel drawPilePanel;
+        [SerializeField] private NewWorldBrainPanel brainPanel;
+>>>>>>> Stashed changes
         [SerializeField] private CyberneticEquipmentSlot[] equipmentSlots = new CyberneticEquipmentSlot[0];
         private readonly List<CardView> handViews = new List<CardView>();
         private readonly List<CardView> choiceViews = new List<CardView>();
@@ -96,6 +101,11 @@ namespace SpotlightGameJam.UI
         {
             if (battle != null) battle.Context.Changed -= OnBattleChanged;
             if (discardPanel) discardPanel.Bind(null);
+<<<<<<< Updated upstream
+=======
+            if (drawPilePanel) drawPilePanel.Bind(null);
+            if (brainPanel) brainPanel.Close();
+>>>>>>> Stashed changes
             foreach (var slot in equipmentSlots) if (slot) slot.Refresh(null);
             battle = null;
         }
@@ -117,6 +127,19 @@ namespace SpotlightGameJam.UI
         {
             if (battle == null || battle.Context.IsFinished || IsChoosing || card == null || card.Data.locksInHand) return;
             CancelSelection();
+            if (card.Data.effects.Any(effect => effect.RequiresReorder))
+            {
+                var context = battle.Context;
+                if (!context.CanPayCardCost(card)) { SetStatus("当前资源不足以支付卡牌费用。"); return; }
+                if (card.Data.category == CardCategory.Cybernetic &&
+                    (card.Source == null || !context.Run.Loadout.Owns(card.Source) || card.Source.Durability <= 0 ||
+                    !context.Usage.CanUse(card.Source.Data.slot))) { SetStatus("来源义体当前不可用。"); return; }
+                if (!brainPanel) { SetStatus("缺少牌堆调整面板。"); return; }
+                pendingCard = card;
+                brainPanel.Open(battle, card, OnReorderFinished);
+                Refresh();
+                return;
+            }
             if (card.Data.effects.Any(effect => effect.RequiresChoice))
             {
                 var choices = battle.GetCyberneticChoices(card);
@@ -153,12 +176,15 @@ namespace SpotlightGameJam.UI
             CancelSelection();
             Report(battle.TryPlayRequest(new CardPlayRequest(card, choiceId: choice.Id)));
         }
+        /// <summary>接收牌堆重排结果，清理待用卡并刷新界面。</summary>
+        private void OnReorderFinished(CardPlayResult result) { pendingCard = null; Report(result); }
 
         /// <summary>取消仅修改展示，不修改牌堆或战斗资源。</summary>
         public void CancelSelection()
         {
             pendingCard = null;
             if (choicePanel) choicePanel.SetActive(false);
+            if (brainPanel) brainPanel.Close();
             ClearViews(choiceViews);
             if (battle != null) Refresh();
         }

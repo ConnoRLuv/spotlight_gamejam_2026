@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 namespace SpotlightGameJam
 {
     /// <summary>
@@ -15,6 +15,6 @@ namespace SpotlightGameJam
         public override string Validate() => amount < 0 ? "临时 AP 不能为负数。" : null;
         /// <summary>增加本回合有效的临时行动点，剩余点数在回合结束时清除。</summary>
         public override void Execute(BattleContext context, CardInstance card, CombatantState target)
-        { context.ActionPoints.AddTemporary(amount); }
+        { context.GainActionPoints(card, amount); }
     }
 }

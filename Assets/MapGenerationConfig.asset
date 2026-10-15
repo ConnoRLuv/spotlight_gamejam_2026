@@ -62,7 +62,11 @@ MonoBehaviour:
     Color: {r: 0.3, g: 0.85, b: 0.4, a: 1}
     Icon: {fileID: 21300000, guid: 3827fc5ca8f991a4db417838f9b5401b, type: 3}
     OverlayIcon: {fileID: 0}
+<<<<<<< Updated upstream
     CustomPrefab: {fileID: 5938563325082082184, guid: 2bb9913914188a042a7b2b7e9d5041b2, type: 3}
+=======
+    CustomPrefab: {fileID: 2764314581427243032, guid: 43b4b87539e606a4ba4671ca871ca359, type: 3}
+>>>>>>> Stashed changes
   - TypeKey: monster
     DisplayName: "\u6218\u6597"
     Tags:
@@ -70,7 +74,11 @@ MonoBehaviour:
     Color: {r: 0.75, g: 0.75, b: 0.75, a: 1}
     Icon: {fileID: 21300000, guid: 0b1ebc7d88744f049b4f1cf67fdf8c25, type: 3}
     OverlayIcon: {fileID: 0}
+<<<<<<< Updated upstream
     CustomPrefab: {fileID: 5809621380742597566, guid: 29cf8e01d251d5848836fd847a3de3dd, type: 3}
+=======
+    CustomPrefab: {fileID: 6970946043293370439, guid: 9fc1b45fd0c4a4549b7e962aca26f767, type: 3}
+>>>>>>> Stashed changes
   - TypeKey: elite
     DisplayName: "\u7CBE\u82F1"
     Tags:
@@ -79,7 +87,11 @@ MonoBehaviour:
     Color: {r: 0.85, g: 0.3, b: 0.3, a: 1}
     Icon: {fileID: 21300000, guid: e947316d450d36941b6aab7f157ef888, type: 3}
     OverlayIcon: {fileID: 0}
+<<<<<<< Updated upstream
     CustomPrefab: {fileID: 5200937576810285310, guid: 0dcd185bc16f5b143a17b2b6b39b6914, type: 3}
+=======
+    CustomPrefab: {fileID: 2638061939401371123, guid: df4b23463bd22824bb29846b3cdb8dc8, type: 3}
+>>>>>>> Stashed changes
   - TypeKey: event
     DisplayName: "\u4E8B\u4EF6"
     Tags:
@@ -87,7 +99,11 @@ MonoBehaviour:
     Color: {r: 0.4, g: 0.7, b: 0.9, a: 1}
     Icon: {fileID: 21300000, guid: 12a9683a1c6e6884aba1051b95f828e2, type: 3}
     OverlayIcon: {fileID: 0}
+<<<<<<< Updated upstream
     CustomPrefab: {fileID: 1761977223499553725, guid: bb198759dfa353b4eb3fb20254f69d88, type: 3}
+=======
+    CustomPrefab: {fileID: 2864015161310306584, guid: 8a81cbf9a502e724fa74500c42a22d47, type: 3}
+>>>>>>> Stashed changes
   - TypeKey: shop
     DisplayName: "\u5546\u4EBA"
     Tags:
@@ -95,7 +111,11 @@ MonoBehaviour:
     Color: {r: 0.95, g: 0.8, b: 0.35, a: 1}
     Icon: {fileID: 21300000, guid: 360e473a0adb1914a85de257e6bd63f4, type: 3}
     OverlayIcon: {fileID: 0}
+<<<<<<< Updated upstream
     CustomPrefab: {fileID: 7378794502260780177, guid: c973f40a1212a4e48bcd59400e4a0386, type: 3}
+=======
+    CustomPrefab: {fileID: 6921134553288062683, guid: 69fc41f3c737b034cb1ced64cd8d911a, type: 3}
+>>>>>>> Stashed changes
   - TypeKey: boss
     DisplayName: "\u9996\u9886"
     Tags:
@@ -104,7 +124,11 @@ MonoBehaviour:
     Color: {r: 0.6, g: 0.2, b: 0.6, a: 1}
     Icon: {fileID: 21300000, guid: 29e7bdd4f7617a14c8fcca0136009f94, type: 3}
     OverlayIcon: {fileID: 0}
+<<<<<<< Updated upstream
     CustomPrefab: {fileID: 2003268525000235154, guid: 61585cdcd60085947b835aa59e54940e, type: 3}
+=======
+    CustomPrefab: {fileID: 2308774750323578063, guid: 3f7523b0b1972334a8c8d58127aa4f4e, type: 3}
+>>>>>>> Stashed changes
   _routes:
   - Direction: 0
     Sprite: {fileID: 21300000, guid: 28b9a83ac794da94084b1278d3e0c743, type: 3}

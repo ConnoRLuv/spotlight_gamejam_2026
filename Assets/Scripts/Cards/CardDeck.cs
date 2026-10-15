@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 namespace SpotlightGameJam
@@ -86,6 +86,15 @@ namespace SpotlightGameJam
             if (Hand.Count >= Hand.Capacity || !DrawPile.Contains(card) || !DrawPile.TryRemove(card)) return false;
             return Hand.TryAdd(card);
         }
+        /// <summary>返回抽牌堆当前抽取顺序（索引 0 为下一张将抽到的牌）。</summary>
+        public IReadOnlyList<CardInstance> GetDrawPileOrder() => DrawPile.Cards.Reverse().ToArray();
+        /// <summary>按“下一张在前”的顺序重排抽牌堆；列表必须恰好覆盖全部抽牌堆卡牌。</summary>
+        public bool ReorderDrawPile(IReadOnlyList<CardInstance> topFirstOrder) =>
+            topFirstOrder != null && topFirstOrder.Count == DrawPile.Count && DrawPile.Reorder(topFirstOrder.Reverse().ToArray());
+        /// <summary>查询手牌是否仍有容纳空间；无上限时始终视为有空间，供套装回收判定。</summary>
+        public bool CanAddToHand() => Hand.Count < Hand.Capacity || Hand.IgnoreCapacity;
+        /// <summary>临时解除或恢复本套手牌容量上限，本回合生效，回合开始由控制器重置。</summary>
+        internal void SetIgnoreHandCapacity(bool value) { Hand.IgnoreCapacity = value; }
         /// <summary>清理本回合生成牌，包含因其他操作进入弃牌堆的临时实例。</summary>
         internal void RemoveTurnCards()
         {

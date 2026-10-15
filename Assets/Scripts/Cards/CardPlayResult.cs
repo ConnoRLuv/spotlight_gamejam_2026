@@ -1,4 +1,4 @@
-namespace SpotlightGameJam
+﻿namespace SpotlightGameJam
 {
     /// <summary>
     /// 枚举出牌失败原因，供 UI 显示提示或选择不同反馈。
@@ -10,7 +10,12 @@ namespace SpotlightGameJam
     {
         None, InvalidPhase, Busy, CardNotInHand, LockedCard, InvalidConfiguration,
         InvalidTarget, InsufficientAp, InsufficientSanity, UnavailableCybernetic,
+<<<<<<< Updated upstream
         ChoiceRequired, InvalidChoice, HandFull, EffectUnavailable
+=======
+        ChoiceRequired, InvalidChoice, HandFull, EffectUnavailable, InsufficientHealth,
+        ReorderRequired
+>>>>>>> Stashed changes
     }
     /// <summary>
     /// 携带一次出牌指令的结果，包含是否成功、失败类型和可读提示。

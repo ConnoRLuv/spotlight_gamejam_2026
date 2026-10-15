@@ -1,0 +1,16 @@
+{
+    "name": "RoguelikeMap.Unity",
+    "rootNamespace": "RoguelikeMap.Unity",
+    "references": [
+        "RoguelikeMap.Core"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
