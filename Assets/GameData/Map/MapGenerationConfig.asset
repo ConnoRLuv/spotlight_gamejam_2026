@@ -1,0 +1,145 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6094642369ed5d44b809d29213eb818c, type: 3}
+  m_Name: MapGenerationConfig
+  m_EditorClassIdentifier: 
+  _config:
+    Rows: 15
+    Columns: 7
+    PathCount: 6
+    IncludeBossNode: 1
+    BossTypeKey: boss
+    HasStartNode: 1
+    StartTypeKey: start
+    MaxOutDegree: 3
+    BaseSeed: 0
+    MaxGenerationAttempts: 64
+    Weights:
+    - TypeKey: monster
+      BaseWeight: 45
+      WeightPerRow: -0.6
+      MinRow: 2
+      MaxRow: -1
+    - TypeKey: event
+      BaseWeight: 22
+      WeightPerRow: 0.3
+      MinRow: 2
+      MaxRow: -1
+    - TypeKey: elite
+      BaseWeight: 0
+      WeightPerRow: 1.5
+      MinRow: 5
+      MaxRow: -1
+    - TypeKey: shop
+      BaseWeight: 4
+      WeightPerRow: 0.25
+      MinRow: 5
+      MaxRow: -1
+    FixedRows:
+    - Row: 1
+      TypeKey: monster
+    - Row: 14
+      TypeKey: shop
+    FallbackOrder:
+    - monster
+    - event
+    - shop
+    MinPathCount: 8
+    MaxPathCount: 4096
+  _visuals:
+  - TypeKey: start
+    DisplayName: "\u8D77\u70B9"
+    Tags: []
+    Color: {r: 0.3, g: 0.85, b: 0.4, a: 1}
+    Icon: {fileID: 21300000, guid: 3827fc5ca8f991a4db417838f9b5401b, type: 3}
+    OverlayIcon: {fileID: 0}
+    CustomPrefab: {fileID: 0}
+  - TypeKey: monster
+    DisplayName: "\u6218\u6597"
+    Tags:
+    - combat
+    Color: {r: 0.75, g: 0.75, b: 0.75, a: 1}
+    Icon: {fileID: 21300000, guid: 0b1ebc7d88744f049b4f1cf67fdf8c25, type: 3}
+    OverlayIcon: {fileID: 0}
+    CustomPrefab: {fileID: 0}
+  - TypeKey: elite
+    DisplayName: "\u7CBE\u82F1"
+    Tags:
+    - combat
+    - highRisk
+    Color: {r: 0.85, g: 0.3, b: 0.3, a: 1}
+    Icon: {fileID: 21300000, guid: e947316d450d36941b6aab7f157ef888, type: 3}
+    OverlayIcon: {fileID: 0}
+    CustomPrefab: {fileID: 0}
+  - TypeKey: event
+    DisplayName: "\u4E8B\u4EF6"
+    Tags:
+    - safe
+    Color: {r: 0.4, g: 0.7, b: 0.9, a: 1}
+    Icon: {fileID: 21300000, guid: 12a9683a1c6e6884aba1051b95f828e2, type: 3}
+    OverlayIcon: {fileID: 0}
+    CustomPrefab: {fileID: 0}
+  - TypeKey: shop
+    DisplayName: "\u5546\u4EBA"
+    Tags:
+    - safe
+    Color: {r: 0.95, g: 0.8, b: 0.35, a: 1}
+    Icon: {fileID: 21300000, guid: 360e473a0adb1914a85de257e6bd63f4, type: 3}
+    OverlayIcon: {fileID: 0}
+    CustomPrefab: {fileID: 0}
+  - TypeKey: boss
+    DisplayName: "\u9996\u9886"
+    Tags:
+    - combat
+    - terminal
+    Color: {r: 0.6, g: 0.2, b: 0.6, a: 1}
+    Icon: {fileID: 21300000, guid: 29e7bdd4f7617a14c8fcca0136009f94, type: 3}
+    OverlayIcon: {fileID: 0}
+    CustomPrefab: {fileID: 0}
+  _routes:
+  - Direction: 0
+    Sprite: {fileID: 21300000, guid: 28b9a83ac794da94084b1278d3e0c743, type: 3}
+    Prefab: {fileID: 0}
+    SourceEnd: {x: 0.5, y: 0}
+    TargetEnd: {x: 0.5, y: 1}
+  - Direction: 1
+    Sprite: {fileID: 21300000, guid: 9a9668140da57ba41a437054aacefc2a, type: 3}
+    Prefab: {fileID: 0}
+    SourceEnd: {x: 0.5, y: 0}
+    TargetEnd: {x: 0.5, y: 1}
+  - Direction: 2
+    Sprite: {fileID: 21300000, guid: e5bb85c5ffbc7c04cafcd5b77daa224b, type: 3}
+    Prefab: {fileID: 0}
+    SourceEnd: {x: 0.5, y: 0}
+    TargetEnd: {x: 0.5, y: 1}
+  - Direction: 3
+    Sprite: {fileID: 21300000, guid: 0fc1ca665f5947b48a652edf594c8b78, type: 3}
+    Prefab: {fileID: 0}
+    SourceEnd: {x: 0.5, y: 0}
+    TargetEnd: {x: 0.5, y: 1}
+  - Direction: 4
+    Sprite: {fileID: 21300000, guid: bd007157ab06f544e9a84bc42e460359, type: 3}
+    Prefab: {fileID: 0}
+    SourceEnd: {x: 0.5, y: 0}
+    TargetEnd: {x: 0.5, y: 1}
+  - Direction: 5
+    Sprite: {fileID: 21300000, guid: d7eba62ad4b0c0b479ac73651c8dfb0c, type: 3}
+    Prefab: {fileID: 0}
+    SourceEnd: {x: 0.5, y: 0}
+    TargetEnd: {x: 0.5, y: 1}
+  BackgroundSprite: {fileID: 21300000, guid: f0c6e44da11c6c045bf43db8f2328e07, type: 3}
+  BackgroundPreserveAspect: 1
+  BackgroundTint: {r: 1, g: 1, b: 1, a: 1}
+  BackdropSprite: {fileID: 21300000, guid: 3c5afef83e2cb76438ce5198753dc536, type: 3}
+  BackdropTileScale: 0.25
+  BackdropPadding: 150
+  BackdropAlpha: 1

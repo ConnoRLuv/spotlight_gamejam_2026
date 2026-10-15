@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -17,13 +17,8 @@ namespace SpotlightGameJam
         [SerializeField] private CardData phantomPain;
         [Tooltip("可选：新冒险采用的义体牌组。为空时沿用下方 Initial Cybernetics；不会替换正在进行的冒险装备。")]
         [SerializeField] private CyberneticDeckData initialCyberneticDeck;
-<<<<<<< Updated upstream
-=======
-        [Tooltip("直接运行战斗场景时可触发的组合 Buff；已有探索会话仍使用会话内配置。")]
-        [SerializeField] private RunBuffData[] runBuffs = Array.Empty<RunBuffData>();
         [Tooltip("穿戴一整套同系列义体即生效的全局套装；已有探索会话仍使用会话内配置。")]
         [SerializeField] private NewWorldSetBonusData[] setBonuses = Array.Empty<NewWorldSetBonusData>();
->>>>>>> Stashed changes
         [Tooltip("未选择义体牌组时使用的初始装备，也可用于自由混搭不同系列。")]
         [SerializeField] private CyberneticData[] initialCybernetics = Array.Empty<CyberneticData>();
         [SerializeField, Min(1)] private int enemyHealth = 30;
@@ -55,13 +50,8 @@ namespace SpotlightGameJam
             }
             if (selectedCybernetics == null) return Fail("初始义体列表为空引用。");
             var errors = ValidateEncounterConfiguration(selectedCybernetics);
-<<<<<<< Updated upstream
-=======
-            foreach (var buff in runBuffs ?? Array.Empty<RunBuffData>())
-                if (!buff) errors.Add("组合 Buff 含空引用。"); else errors.AddRange(buff.Validate());
             foreach (var bonus in setBonuses ?? Array.Empty<NewWorldSetBonusData>())
                 if (!bonus) errors.Add("套装含空引用。"); else errors.AddRange(bonus.Validate());
->>>>>>> Stashed changes
             var slots = new HashSet<CyberneticSlot>();
             foreach (var data in selectedCybernetics)
             {
@@ -74,14 +64,8 @@ namespace SpotlightGameJam
             if (errors.Count > 0) return Fail(string.Join("\n",errors));
             // 用候选对象初始化，避免配置失败时覆盖现有冒险引用。
             var nextRun = new RunState(rules);
-<<<<<<< Updated upstream
             foreach (var data in selectedCybernetics) nextRun.Loadout.Equip(new CyberneticInstance(data));
-=======
-            foreach (var data in selectedCybernetics) nextRun.Loadout.AddInitial(data);
-            // 独立测试场景也配置组合定义；配置本身不会激活，仍需同回合成功打出四部位。
-            nextRun.Buffs.Configure(runBuffs);
             nextRun.SetBonuses.Configure(setBonuses);
->>>>>>> Stashed changes
             var candidate = CreateEncounter(nextRun,0);
             if (!candidate.StartBattle()) { candidate.Context.Dispose(); return Fail(candidate.LastError); }
             // 首场启动成功后才发布新冒险；失败不会替换旧 Run/Battle。

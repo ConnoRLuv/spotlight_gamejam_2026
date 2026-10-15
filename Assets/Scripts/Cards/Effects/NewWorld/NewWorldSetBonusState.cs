@@ -9,19 +9,19 @@ namespace SpotlightGameJam
     /// </summary>
     /// <remarks>
     /// 每个探索创建一个实例（保存在 RunState），每场战斗通过 BattleContext 构造/释放完成
-    /// 对 CardPlayed 事件的订阅；装备变化会即时重算，跨战斗保留判定结果。
+    /// 对 CardPlayed 事件的订阅；装备可能随战斗变化，因此每次出牌前按当前装备重算生效集合。
     /// </remarks>
     public sealed class NewWorldSetBonusState
     {
         private readonly CyberneticLoadout loadout;
-        private readonly List<NewWorldSetBonusData> definitions = new List<NewWorldSetBonusData>();
+        private NewWorldSetBonusData[] definitions = Array.Empty<NewWorldSetBonusData>();
         private readonly List<NewWorldSetBonusData> active = new List<NewWorldSetBonusData>();
         private BattleContext context;
         private bool attached;
         public IReadOnlyList<NewWorldSetBonusData> Active => active.ToArray();
         public event Action Changed;
 
-        /// <summary>保存装备归属查询入口；耐久、抽弃牌和维修不会触发套装重算以外的操作。</summary>
+        /// <summary>保存装备归属查询入口；耐久、抽弃牌和维修不会触发套装以外的操作。</summary>
         public NewWorldSetBonusState(CyberneticLoadout loadout)
         { this.loadout = loadout ?? throw new ArgumentNullException(nameof(loadout)); }
 
@@ -31,19 +31,17 @@ namespace SpotlightGameJam
             var candidates = bonuses?.Where(value => value).Distinct().ToArray() ?? Array.Empty<NewWorldSetBonusData>();
             foreach (var bonus in candidates)
                 if (bonus.Validate().Count > 0) throw new ArgumentException("新世界套装配置无效。");
-            definitions.Clear(); definitions.AddRange(candidates);
+            definitions = candidates;
             Recompute();
         }
 
-        /// <summary>绑定当前战斗的“成功出牌”事件，并立即按装备重算；重复绑定同一战斗只刷新。</summary>
+        /// <summary>绑定当前战斗的“成功出牌”事件，并立即按装备重算。</summary>
         public void Attach(BattleContext battle)
         {
             if (battle == null) throw new ArgumentNullException(nameof(battle));
-            if (attached && context == battle) { Recompute(); return; }
             Detach();
             context = battle;
             context.CardPlayed += OnCardPlayed;
-            loadout.Changed += OnLoadoutChanged;
             attached = true;
             Recompute();
         }
@@ -53,7 +51,6 @@ namespace SpotlightGameJam
         {
             if (battle != null && context != battle) return;
             if (context != null) context.CardPlayed -= OnCardPlayed;
-            loadout.Changed -= OnLoadoutChanged;
             context = null; attached = false;
         }
 
@@ -66,12 +63,12 @@ namespace SpotlightGameJam
             Changed?.Invoke();
         }
 
-        private void OnLoadoutChanged() { Recompute(); }
-
         /// <summary>战斗仍未结束时，把每张成功打出的牌分发给当前生效的套装。</summary>
         private void OnCardPlayed(CardInstance card)
         {
-            if (context == null || context.IsFinished || active.Count == 0) return;
+            if (context == null || context.IsFinished) return;
+            Recompute();
+            if (active.Count == 0) return;
             foreach (var bonus in active) Apply(bonus, context);
         }
 

@@ -239,7 +239,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 32d9d77dea3fb5f40b28efcc09485845, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  _generator: {fileID: 0}
+  _generator: {fileID: 1204734452}
   _nodeRoot: {fileID: 0}
   _edgeRoot: {fileID: 0}
   _nodePrefab: {fileID: 0}
@@ -265,7 +265,7 @@ MonoBehaviour:
     CurrentHighlightScale: 1.7
     TintBadgeWithTypeColor: 0
   _nodeSize: {x: 130, y: 130}
-  _configAsset: {fileID: 0}
+  _configAsset: {fileID: 11400000, guid: fbd7d601b52dd174fb0d7870760e7f5e, type: 2}
   _autoFitToViewport: 0
   _fitPadding: 40
   _scrollSpeed: 150

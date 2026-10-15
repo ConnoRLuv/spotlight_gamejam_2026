@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 namespace SpotlightGameJam
 {
@@ -12,13 +12,6 @@ namespace SpotlightGameJam
     public sealed class CyberneticData : ScriptableObject
     {
         public string cyberneticId;
-<<<<<<< Updated upstream
-=======
-        [Tooltip("义体所属阵营，用于同阵营改造候选筛选。")]
-        public string factionId = "tian-qiong-legion";
-        [Tooltip("义体所属系列（例如 new-world）；同系列穿戴齐全可触发套装效果。")]
-        public string setId;
->>>>>>> Stashed changes
         public CyberneticSlot slot;
         [Min(1)] public int maxDurability = 3;
         // 可重复引用同一配置以表示多张牌；理智费用统一定义在各 CardData 中。

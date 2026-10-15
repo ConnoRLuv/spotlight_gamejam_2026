@@ -1,4 +1,4 @@
-﻿namespace SpotlightGameJam
+namespace SpotlightGameJam
 {
     /// <summary>单场战斗的义体临时状态；不写入共享配置，也不随冒险跨战斗保留。</summary>
     public sealed class BattleTurnEffects
@@ -7,15 +7,8 @@
         public CardData ConversionAttack { get; internal set; }
         public bool ConversionEnabled => ConversionAttack != null;
         public int ExtraTurns { get; internal set; }
-<<<<<<< Updated upstream
-=======
-        public bool DrawFromDiscardNextTurn { get; internal set; }
-        public bool FreeBasicCards { get; internal set; }
-        // 此项在回合刷新时保留，仅战斗结束时清除。
-        public bool CyberneticsPayHealth { get; internal set; }
         // 本回合过载获得的行动点视为永久行动点，回合开始清除。
         public bool OverloadApPermanent { get; internal set; }
->>>>>>> Stashed changes
 
         /// <summary>清除上一回合的承伤保护和攻击转换状态，开始新的玩家回合。</summary>
         internal void BeginTurn()
@@ -23,24 +16,15 @@
             // 承伤保护保留至敌人行动结束，而 AP 转换仅属于玩家行动阶段。
             DamageToSanityArmed = false;
             ConversionAttack = null;
-<<<<<<< Updated upstream
-=======
-            FreeBasicCards = false;
             OverloadApPermanent = false;
->>>>>>> Stashed changes
         }
         /// <summary>结束玩家行动阶段，关闭仅在本阶段有效的攻击转换。</summary>
         internal void EndPlayerAction() { ConversionAttack = null; }
         /// <summary>清空临时义体效果，包括尚未消费的额外回合。</summary>
         internal void Clear()
-<<<<<<< Updated upstream
-        { DamageToSanityArmed = false; ConversionAttack = null; ExtraTurns = 0; }
-=======
         {
             DamageToSanityArmed = false; ConversionAttack = null; ExtraTurns = 0;
-            DrawFromDiscardNextTurn = false; FreeBasicCards = false; CyberneticsPayHealth = false;
             OverloadApPermanent = false;
         }
->>>>>>> Stashed changes
     }
 }

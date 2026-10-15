@@ -16,9 +16,8 @@ namespace SpotlightGameJam
     /// 新世界系列套装配置：穿戴一整套同系列义体后持续生效的全局被动效果。
     /// </summary>
     /// <remarks>
-    /// 与同回合打出四部位才激活的 RunBuffData 不同，本配置按“拥有/穿戴”判定：
-    /// 只要探索牌组拥有 requiredParts 覆盖的四个部位即视为穿戴齐全，随后每次出牌触发。
-    /// 判定不依赖耐久，报废部件仍视为已拥有，与装备模型“拥有即穿戴”保持一致。
+    /// 按“拥有/穿戴”判定：四个部位都装备了 requiredParts 指定的义体即视为穿戴齐全，
+    /// 随后每次出牌触发一次全局效果。判定不依赖耐久，报废部件仍视为已穿戴。
     /// </remarks>
     [CreateAssetMenu(menuName = "Spotlight/新世界/套装效果配置")]
     public sealed class NewWorldSetBonusData : ScriptableObject
@@ -26,7 +25,7 @@ namespace SpotlightGameJam
         public string setId;
         public string setName;
         [TextArea] public string description;
-        [Tooltip("穿戴齐全所需部件；必须覆盖脑机、躯干、手部、腿部且同属一个系列。")]
+        [Tooltip("穿戴齐全所需部件；必须覆盖脑机、躯干、手部、腿部四个部位。")]
         public CyberneticData[] requiredParts = Array.Empty<CyberneticData>();
         public NewWorldSetTrigger trigger = NewWorldSetTrigger.OnAnyCardPlayed;
         public NewWorldSetEffect effect = NewWorldSetEffect.ReturnBasicFromDiscard;
@@ -49,15 +48,14 @@ namespace SpotlightGameJam
                 errors.Add("套装必须覆盖脑机、躯干、手部、腿部四个部位。");
             if (requiredParts.Select(part => part.cyberneticId).Distinct().Count() != 4)
                 errors.Add("套装部件身份重复。");
-            if (requiredParts.Any(part => string.IsNullOrWhiteSpace(part.setId) || part.setId != setId))
-                errors.Add("套装部件必须同属该系列。");
             foreach (var part in requiredParts) errors.AddRange(part.Validate());
             return errors;
         }
 
-        /// <summary>判断探索装备是否已穿戴齐全；按义体 ID 判重，不要求部件耐久大于零。</summary>
+        /// <summary>判断四个部位是否都装备了本套部件；按义体 ID 判重，不要求部件耐久大于零。</summary>
         public bool IsComplete(CyberneticLoadout loadout) =>
             loadout != null && requiredParts != null && requiredParts.Length == 4 &&
-            requiredParts.All(part => part && loadout.OwnsConfiguration(part));
+            requiredParts.All(part => part && loadout.Get(part.slot) != null &&
+                loadout.Get(part.slot).Data.cyberneticId == part.cyberneticId);
     }
 }

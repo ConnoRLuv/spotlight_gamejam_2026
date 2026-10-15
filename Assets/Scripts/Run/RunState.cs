@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 namespace SpotlightGameJam
@@ -15,11 +15,7 @@ namespace SpotlightGameJam
         private readonly ReadOnlyCollection<CardData> rewardView;
         public CombatantState Player { get; }
         public CyberneticLoadout Loadout { get; } = new CyberneticLoadout();
-<<<<<<< Updated upstream
-=======
-        public RunBuffState Buffs { get; }
         public NewWorldSetBonusState SetBonuses { get; }
->>>>>>> Stashed changes
         public int Gold { get; private set; }
         // 普通冒险牌组中的唯一持久幻痛条目；战斗重建牌区时再次加入手牌，不写回共享资产。
         public CardData PhantomPain { get; private set; }
@@ -30,11 +26,7 @@ namespace SpotlightGameJam
         {
             if (!rules || rules.Validate().Count > 0) throw new ArgumentException("战斗规则配置不合法。");
             Player = new CombatantState("player",rules.MaxHealth,rules.MaxSanity);
-<<<<<<< Updated upstream
-=======
-            Buffs = new RunBuffState(Loadout);
             SetBonuses = new NewWorldSetBonusState(Loadout);
->>>>>>> Stashed changes
             Player.Changed += OnPlayerChanged;
             rewardView = rewards.AsReadOnly();
         }

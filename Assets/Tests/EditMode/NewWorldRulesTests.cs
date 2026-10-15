@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using NUnit.Framework;
 
@@ -13,13 +13,11 @@ namespace SpotlightGameJam.Tests
         [TearDown] public void TearDown() => assets.Dispose();
 
         /// <summary>创建一个可选部位的义体配置，用于组合完整套装。</summary>
-        private CyberneticData MakePart(CyberneticSlot slot, string setId)
+        private CyberneticData MakePart(CyberneticSlot slot)
         {
             var card = assets.Card(assets.Create<ShieldEffectData>(), category: CardCategory.Cybernetic, ap: 0, sanity: 2);
             var data = assets.Create<CyberneticData>();
             data.cyberneticId = "new-world-part-" + (int)slot;
-            data.setId = setId;
-            data.factionId = "tian-qiong-legion";
             data.slot = slot;
             data.maxDurability = 3;
             data.cards = new[] { card };
@@ -124,12 +122,12 @@ namespace SpotlightGameJam.Tests
             var context = assets.Context(Enumerable.Repeat(basic, 6).ToArray());
             var parts = new[]
             {
-                MakePart(CyberneticSlot.Brain, "new-world"),
-                MakePart(CyberneticSlot.Torso, "new-world"),
-                MakePart(CyberneticSlot.Hands, "new-world"),
-                MakePart(CyberneticSlot.Legs, "new-world")
+                MakePart(CyberneticSlot.Brain),
+                MakePart(CyberneticSlot.Torso),
+                MakePart(CyberneticSlot.Hands),
+                MakePart(CyberneticSlot.Legs)
             };
-            foreach (var part in parts) context.Run.Loadout.AddInitial(part);
+            foreach (var part in parts) context.Run.Loadout.Equip(new CyberneticInstance(part));
             context.Run.SetBonuses.Configure(new[] { MakeBonus(parts) });
             TestAssets.Prepare(context);
 
@@ -151,18 +149,18 @@ namespace SpotlightGameJam.Tests
         {
             var parts = new[]
             {
-                MakePart(CyberneticSlot.Brain, "new-world"),
-                MakePart(CyberneticSlot.Torso, "new-world"),
-                MakePart(CyberneticSlot.Hands, "new-world"),
-                MakePart(CyberneticSlot.Legs, "new-world")
+                MakePart(CyberneticSlot.Brain),
+                MakePart(CyberneticSlot.Torso),
+                MakePart(CyberneticSlot.Hands),
+                MakePart(CyberneticSlot.Legs)
             };
             var bonus = MakeBonus(parts);
             var complete = new CyberneticLoadout();
-            foreach (var part in parts) complete.AddInitial(part);
+            foreach (var part in parts) complete.Equip(new CyberneticInstance(part));
             Assert.That(bonus.IsComplete(complete), Is.True);
 
             var incomplete = new CyberneticLoadout();
-            for (int i = 0; i < 3; i++) incomplete.AddInitial(parts[i]);
+            for (int i = 0; i < 3; i++) incomplete.Equip(new CyberneticInstance(parts[i]));
             Assert.That(bonus.IsComplete(incomplete), Is.False);
         }
     }

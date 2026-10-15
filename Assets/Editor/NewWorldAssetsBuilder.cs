@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using SpotlightGameJam.UI;
 using UnityEditor;
@@ -14,7 +14,6 @@ namespace SpotlightGameJam.Editor
     /// </remarks>
     public static class NewWorldAssetsBuilder
     {
-        private const string FactionId = "tian-qiong-legion";
         private const string SetId = "new-world";
         private const string DeckPath = "Assets/GameData/CyberneticDecks/NewWorld.asset";
         private const string SetBonusPath = "Assets/GameData/SetBonuses/NewWorld.asset";
@@ -63,7 +62,7 @@ namespace SpotlightGameJam.Editor
                 });
                 sources[i] = Asset<CyberneticData>("Assets/GameData/Cybernetics/" + Keys[i] + ".asset", value =>
                 {
-                    value.cyberneticId = Keys[i]; value.factionId = FactionId; value.setId = SetId;
+                    value.cyberneticId = Keys[i];
                     value.slot = (CyberneticSlot)part; value.maxDurability = 3;
                     value.cards = Enumerable.Repeat(cards[part], 3).ToArray();
                 });
@@ -72,12 +71,11 @@ namespace SpotlightGameJam.Editor
             var deck = Asset<CyberneticDeckData>(DeckPath, value =>
             {
                 value.deckId = SetId; value.deckName = "Type-00：新世界（初始义体）"; value.cybernetics = sources;
-                value.reservedSetBonusDescription = "穿戴一整套后，每当你打出一张牌，将弃牌堆中的一张基本牌加入手牌；手牌已满则不再获得。";
             });
             var bonus = Asset<NewWorldSetBonusData>(SetBonusPath, value =>
             {
                 value.setId = SetId; value.setName = "Type-00：新世界";
-                value.description = deck.reservedSetBonusDescription;
+                value.description = "穿戴一整套后，每当你打出一张牌，将弃牌堆中的一张基本牌加入手牌；手牌已满则不再获得。";
                 value.requiredParts = sources;
                 value.trigger = NewWorldSetTrigger.OnAnyCardPlayed;
                 value.effect = NewWorldSetEffect.ReturnBasicFromDiscard;

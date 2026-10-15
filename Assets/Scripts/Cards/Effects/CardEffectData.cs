@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 namespace SpotlightGameJam
 {
@@ -20,14 +20,6 @@ namespace SpotlightGameJam
         public virtual bool RequiresTarget => false;
         /// <summary>需要选牌时，普通 TryPlay 在支付前返回 ChoiceRequired。</summary>
         public virtual bool RequiresChoice => false;
-<<<<<<< Updated upstream
-=======
-        public virtual string ChoiceTitle => "选择一张卡牌";
-        public virtual string ChoicePrompt => "请选择一张卡牌；取消不消耗资源。";
-        public virtual bool ReserveChoiceBeforePayment => false;
-        /// <summary>返回交互候选快照；默认效果无需选择，具体选牌效果覆盖此入口。</summary>
-        public virtual IReadOnlyList<CardInstance> GetChoices(BattleContext context, CardInstance card) =>
-            System.Array.Empty<CardInstance>();
         /// <summary>需要重排抽牌堆时返回 true；重排结果经 CardPlayRequest.Reorder 提交。</summary>
         public virtual bool RequiresReorder => false;
         public virtual string ReorderTitle => "调整抽牌堆顺序";
@@ -38,7 +30,6 @@ namespace SpotlightGameJam
         /// <summary>只读校验提交的重排顺序是否恰好覆盖目标牌区；不移动卡牌。</summary>
         public virtual bool ValidateReorder(BattleContext context, CardInstance card, IReadOnlyList<CardInstance> order) =>
             order != null && order.Count > 0;
->>>>>>> Stashed changes
         /// <summary>扩展请求入口；基础效果沿用原有签名，避免破坏既有调用。</summary>
         public virtual bool CanExecuteRequest(BattleContext context, CardPlayRequest request) =>
             CanExecute(context, request.Card, request.Target);
