@@ -1,0 +1,23 @@
+{
+"skeleton": { "hash": "vV6yFsXImQwgyiLGW9b7MxqoFJ0", "spine": "3.8.99", "images": "../特效序列/预合成 1/", "audio": "../" },
+"bones": [
+	{ "name": "root", "x": -443.04, "y": 161.62, "scaleX": 0.6, "scaleY": 0.6 }
+],
+"animations": {
+	"1": {
+		"bones": {
+			"root": {
+				"translate": [
+					{ "time": 0.6667, "x": 308.27, "y": 75.94, "curve": "stepped" },
+					{ "time": 1.6667, "x": 308.27, "y": 75.94, "curve": 0, "c2": 1, "c3": 0.75 },
+					{ "time": 2.1333, "x": 430.98, "y": 71.19 }
+				],
+				"scale": [
+					{ "x": 0.81 }
+				]
+			}
+		}
+	},
+	"animation": {}
+}
+}
