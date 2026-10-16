@@ -7,8 +7,11 @@ namespace SpotlightGameJam
         public CardData ConversionAttack { get; internal set; }
         public bool ConversionEnabled => ConversionAttack != null;
         public int ExtraTurns { get; internal set; }
-        // 本回合过载获得的行动点视为永久行动点，回合开始清除。
+        public bool DrawFromDiscardNextTurn { get; internal set; }
+        public bool FreeBasicCards { get; internal set; }
         public bool OverloadApPermanent { get; internal set; }
+        // 此项在回合刷新时保留，仅战斗结束时清除。
+        public bool CyberneticsPayHealth { get; internal set; }
 
         /// <summary>清除上一回合的承伤保护和攻击转换状态，开始新的玩家回合。</summary>
         internal void BeginTurn()
@@ -17,14 +20,16 @@ namespace SpotlightGameJam
             DamageToSanityArmed = false;
             ConversionAttack = null;
             OverloadApPermanent = false;
+            FreeBasicCards = false;
         }
         /// <summary>结束玩家行动阶段，关闭仅在本阶段有效的攻击转换。</summary>
-        internal void EndPlayerAction() { ConversionAttack = null; }
+        internal void EndPlayerAction() { ConversionAttack = null; FreeBasicCards = false; OverloadApPermanent = false; }
         /// <summary>清空临时义体效果，包括尚未消费的额外回合。</summary>
         internal void Clear()
         {
             DamageToSanityArmed = false; ConversionAttack = null; ExtraTurns = 0;
             OverloadApPermanent = false;
+            DrawFromDiscardNextTurn = false; FreeBasicCards = false; CyberneticsPayHealth = false;
         }
     }
 }

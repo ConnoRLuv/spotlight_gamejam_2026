@@ -59,11 +59,14 @@ namespace SpotlightGameJam
                     break;
             }
             // 以下只读校验必须全部通过后再修改资源，失败路径不扣费、不扣耐久。
-            if (card.Data.requiresEquippedCybernetic && !context.Run.Loadout.Equipped.Any())
+            if (card.Data.requiresEquippedCybernetic && !context.Run.Loadout.Owned.Any())
                 return Reject(CardPlayFailure.UnavailableCybernetic,"需要先装载义体才能使用该牌。");
-            if (!context.ActionPoints.CanSpend(card.EffectiveApCost))
+            if (!context.ActionPoints.CanSpend(context.GetEffectiveApCost(card)))
                 return Reject(CardPlayFailure.InsufficientAp,"行动点不足。");
-            if (!context.Player.CanSpendSanity(card.Data.sanityCost))
+            bool payHealth = context.UsesHealthFor(card);
+            if (payHealth && !context.Player.CanSpendHealth(card.Data.sanityCost))
+                return Reject(CardPlayFailure.InsufficientHealth,"生命不足，支付后必须保留至少 1 点生命。");
+            if (!payHealth && !context.Player.CanSpendSanity(card.Data.sanityCost))
                 return Reject(CardPlayFailure.InsufficientSanity,"理智为零，无法使用消耗理智的牌。");
             if (isCybernetic && (!context.IsUsableSource(card) || !context.Usage.CanUse(card.Source.Data.slot)))
                 return Reject(CardPlayFailure.UnavailableCybernetic,"来源义体未装备、已报废或超过使用限制。");
@@ -78,7 +81,14 @@ namespace SpotlightGameJam
                 return Reject(CardPlayFailure.InvalidChoice,"候选牌已变化或当前无法取牌。");
             if (card.Data.effects.Any(effect => !effect.CanExecuteRequest(context,resolvedRequest)))
                 return Reject(CardPlayFailure.InvalidTarget,"效果前置条件不满足。");
-            int ap = card.EffectiveApCost, sanity = card.Data.sanityCost;
+            var choiceEffect = card.Data.effects.FirstOrDefault(effect => effect.RequiresChoice);
+            if (choiceEffect != null)
+            {
+                var choice = choiceEffect.GetChoices(context, card).FirstOrDefault(value => value.Id == request.ChoiceId);
+                if (choice == null) return Reject(CardPlayFailure.InvalidChoice,"候选牌已变化。");
+                resolvedRequest = new CardPlayRequest(card, target, request.ChoiceId, choice, request.Reorder);
+            }
+            int ap = context.GetEffectiveApCost(card), sanity = card.Data.sanityCost;
             // 固定本次效果顺序，避免执行过程中数组引用被替换影响当前结算。
             var effects = card.Data.effects.ToArray();
             context.IsResolving = true;
@@ -86,7 +96,14 @@ namespace SpotlightGameJam
             {
                 // 先移出成功使用的牌，为幻痛腾出位置；牌效执行期间不回收本牌。
                 deck.Hand.TryRemove(card);
-                context.ActionPoints.TrySpend(ap); context.Player.TrySpendSanity(sanity);
+                // 改造目标先预留，避免支付到零后被幻痛的随机弃牌移走；取消和校验失败不会到这里。
+                if (choiceEffect != null && choiceEffect.ReserveChoiceBeforePayment &&
+                    !context.Ordinary.Hand.TryRemove(resolvedRequest.Choice))
+                    throw new InvalidOperationException("已验证的改造目标无法预留。");
+                context.ActionPoints.TrySpend(ap);
+                if (payHealth && isCybernetic) context.Player.TrySpendHealthAndRestoreSanity(sanity);
+                else if (payHealth) context.Player.TrySpendHealth(sanity);
+                else context.Player.TrySpendSanity(sanity);
                 if (isCybernetic)
                 {
                     context.Usage.RecordUse(card.Source.Data.slot); card.Source.TryConsumeDurability();
@@ -107,6 +124,8 @@ namespace SpotlightGameJam
                 if (!card.ExpiresAtTurnEnd) deck.DiscardPile.TryAdd(card);
                 // 完整出牌后广播，供“每打出一张牌”类套装效果回收弃牌；此时本牌已进入弃牌堆。
                 if (!context.IsFinished) context.NotifyCardPlayed(card);
+                // 只有完整结算成功且战斗仍在进行时才累计组合；本牌费用不被自身新触发的 buff 改写。
+                if (isCybernetic && !context.IsFinished) context.Run.Buffs.RecordPlayed(card);
                 context.NotifyChanged();
                 return CardPlayResult.Played;
             }

@@ -30,6 +30,12 @@ namespace SpotlightGameJam
         /// <summary>只读校验提交的重排顺序是否恰好覆盖目标牌区；不移动卡牌。</summary>
         public virtual bool ValidateReorder(BattleContext context, CardInstance card, IReadOnlyList<CardInstance> order) =>
             order != null && order.Count > 0;
+        public virtual string ChoiceTitle => "选择一张卡牌";
+        public virtual string ChoicePrompt => "请选择一张卡牌；取消不消耗资源。";
+        public virtual bool ReserveChoiceBeforePayment => false;
+        /// <summary>返回交互候选快照；默认效果无需选择，具体选牌效果覆盖此入口。</summary>
+        public virtual IReadOnlyList<CardInstance> GetChoices(BattleContext context, CardInstance card) =>
+            System.Array.Empty<CardInstance>();
         /// <summary>扩展请求入口；基础效果沿用原有签名，避免破坏既有调用。</summary>
         public virtual bool CanExecuteRequest(BattleContext context, CardPlayRequest request) =>
             CanExecute(context, request.Card, request.Target);

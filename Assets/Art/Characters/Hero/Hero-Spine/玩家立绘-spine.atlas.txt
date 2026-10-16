@@ -1,0 +1,376 @@
+
+玩家立绘-spine.png
+size: 2048,2048
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+body
+  rotate: true
+  xy: 498, 1924
+  size: 63, 85
+  orig: 64, 85
+  offset: 0, 0
+  index: -1
+head
+  rotate: false
+  xy: 720, 1917
+  size: 76, 70
+  orig: 78, 72
+  offset: 1, 1
+  index: -1
+left-foot
+  rotate: true
+  xy: 798, 1908
+  size: 79, 130
+  orig: 81, 132
+  offset: 1, 1
+  index: -1
+left-footbody
+  rotate: true
+  xy: 412, 1945
+  size: 42, 84
+  orig: 44, 86
+  offset: 1, 1
+  index: -1
+left-hand
+  rotate: true
+  xy: 300, 1958
+  size: 29, 110
+  orig: 31, 112
+  offset: 1, 1
+  index: -1
+left-handbody
+  rotate: true
+  xy: 47, 1966
+  size: 21, 59
+  orig: 23, 61
+  offset: 1, 1
+  index: -1
+piaodai
+  rotate: true
+  xy: 1074, 1879
+  size: 108, 140
+  orig: 160, 217
+  offset: 0, 0
+  index: -1
+pifeng
+  rotate: true
+  xy: 930, 1887
+  size: 100, 142
+  orig: 100, 142
+  offset: 0, 0
+  index: -1
+right-foot
+  rotate: true
+  xy: 585, 1922
+  size: 65, 133
+  orig: 65, 133
+  offset: 0, 0
+  index: -1
+right-footbody
+  rotate: true
+  xy: 108, 1965
+  size: 22, 89
+  orig: 24, 91
+  offset: 1, 1
+  index: -1
+right-hand
+  rotate: true
+  xy: 199, 1960
+  size: 27, 99
+  orig: 27, 99
+  offset: 0, 0
+  index: -1
+right-handbody
+  rotate: true
+  xy: 5, 1971
+  size: 16, 40
+  orig: 19, 42
+  offset: 1, 1
+  index: -1
+冲击波_00000
+  rotate: false
+  xy: 2, 1986
+  size: 1, 1
+  orig: 1, 1
+  offset: 0, 0
+  index: -1
+冲击波_00001
+  rotate: false
+  xy: 2, 1986
+  size: 1, 1
+  orig: 1, 1
+  offset: 0, 0
+  index: -1
+冲击波_00002
+  rotate: false
+  xy: 2, 1986
+  size: 1, 1
+  orig: 1, 1
+  offset: 0, 0
+  index: -1
+冲击波_00003
+  rotate: false
+  xy: 2, 1986
+  size: 1, 1
+  orig: 1, 1
+  offset: 0, 0
+  index: -1
+冲击波_00004
+  rotate: false
+  xy: 2, 1986
+  size: 1, 1
+  orig: 1, 1
+  offset: 0, 0
+  index: -1
+冲击波_00039
+  rotate: false
+  xy: 2, 1986
+  size: 1, 1
+  orig: 1, 1
+  offset: 0, 0
+  index: -1
+冲击波_00005
+  rotate: false
+  xy: 1216, 1777
+  size: 397, 210
+  orig: 1920, 1080
+  offset: 1316, 436
+  index: -1
+冲击波_00006
+  rotate: false
+  xy: 367, 1680
+  size: 415, 235
+  orig: 1920, 1080
+  offset: 1305, 423
+  index: -1
+冲击波_00007
+  rotate: false
+  xy: 784, 1625
+  size: 415, 252
+  orig: 1920, 1080
+  offset: 1309, 415
+  index: -1
+冲击波_00008
+  rotate: false
+  xy: 1574, 1488
+  size: 405, 266
+  orig: 1920, 1080
+  offset: 1320, 408
+  index: -1
+冲击波_00009
+  rotate: false
+  xy: 2, 1404
+  size: 407, 274
+  orig: 1920, 1080
+  offset: 1318, 404
+  index: -1
+冲击波_00010
+  rotate: false
+  xy: 1187, 1205
+  size: 410, 281
+  orig: 1920, 1080
+  offset: 1315, 401
+  index: -1
+冲击波_00011
+  rotate: false
+  xy: 1599, 1200
+  size: 412, 286
+  orig: 1920, 1080
+  offset: 1313, 398
+  index: -1
+冲击波_00012
+  rotate: false
+  xy: 409, 1045
+  size: 412, 291
+  orig: 1920, 1080
+  offset: 1312, 396
+  index: -1
+冲击波_00013
+  rotate: false
+  xy: 1123, 909
+  size: 414, 294
+  orig: 1920, 1080
+  offset: 1310, 394
+  index: -1
+冲击波_00014
+  rotate: false
+  xy: 1539, 902
+  size: 417, 296
+  orig: 1920, 1080
+  offset: 1307, 393
+  index: -1
+冲击波_00015
+  rotate: false
+  xy: 823, 609
+  size: 420, 298
+  orig: 1920, 1080
+  offset: 1304, 392
+  index: -1
+冲击波_00016
+  rotate: false
+  xy: 1245, 602
+  size: 422, 298
+  orig: 1920, 1080
+  offset: 1301, 392
+  index: -1
+冲击波_00017
+  rotate: false
+  xy: 2, 445
+  size: 424, 298
+  orig: 1920, 1080
+  offset: 1299, 392
+  index: -1
+冲击波_00018
+  rotate: false
+  xy: 728, 309
+  size: 422, 298
+  orig: 1920, 1080
+  offset: 1301, 392
+  index: -1
+冲击波_00019
+  rotate: false
+  xy: 1152, 302
+  size: 416, 298
+  orig: 1920, 1080
+  offset: 1307, 392
+  index: -1
+冲击波_00020
+  rotate: false
+  xy: 1570, 195
+  size: 420, 298
+  orig: 1920, 1080
+  offset: 1303, 392
+  index: -1
+冲击波_00021
+  rotate: false
+  xy: 2, 145
+  size: 422, 298
+  orig: 1920, 1080
+  offset: 1301, 392
+  index: -1
+冲击波_00022
+  rotate: false
+  xy: 426, 9
+  size: 422, 298
+  orig: 1920, 1080
+  offset: 1301, 392
+  index: -1
+冲击波_00023
+  rotate: false
+  xy: 850, 2
+  size: 421, 298
+  orig: 1920, 1080
+  offset: 1302, 392
+  index: -1
+冲击波_00027
+  rotate: false
+  xy: 408, 745
+  size: 413, 298
+  orig: 1920, 1080
+  offset: 1312, 392
+  index: -1
+冲击波_00029
+  rotate: false
+  xy: 2, 1104
+  size: 405, 298
+  orig: 1920, 1080
+  offset: 1322, 392
+  index: -1
+冲击波_00030
+  rotate: true
+  xy: 823, 932
+  size: 404, 298
+  orig: 1920, 1080
+  offset: 1323, 392
+  index: -1
+冲击波_00031
+  rotate: false
+  xy: 2, 804
+  size: 404, 298
+  orig: 1920, 1080
+  offset: 1324, 392
+  index: -1
+冲击波_00032
+  rotate: true
+  xy: 1669, 495
+  size: 405, 298
+  orig: 1920, 1080
+  offset: 1323, 392
+  index: -1
+冲击波_00033
+  rotate: true
+  xy: 428, 337
+  size: 406, 298
+  orig: 1920, 1080
+  offset: 1322, 392
+  index: -1
+冲击波_00034
+  rotate: false
+  xy: 792, 1338
+  size: 393, 285
+  orig: 1920, 1080
+  offset: 1328, 398
+  index: -1
+冲击波_00035
+  rotate: false
+  xy: 411, 1349
+  size: 379, 274
+  orig: 1920, 1080
+  offset: 1336, 404
+  index: -1
+冲击波_00036
+  rotate: false
+  xy: 1201, 1514
+  size: 371, 261
+  orig: 1920, 1080
+  offset: 1337, 410
+  index: -1
+冲击波_00037
+  rotate: false
+  xy: 2, 1714
+  size: 363, 242
+  orig: 1920, 1080
+  offset: 1334, 420
+  index: -1
+冲击波_00038
+  rotate: false
+  xy: 1615, 1756
+  size: 344, 231
+  orig: 1920, 1080
+  offset: 1335, 424
+  index: -1
+
+玩家立绘-spine2.png
+size: 2048,512
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+冲击波_00024
+  rotate: false
+  xy: 2, 2
+  size: 421, 298
+  orig: 1920, 1080
+  offset: 1303, 392
+  index: -1
+冲击波_00025
+  rotate: false
+  xy: 425, 2
+  size: 421, 298
+  orig: 1920, 1080
+  offset: 1303, 392
+  index: -1
+冲击波_00026
+  rotate: false
+  xy: 848, 2
+  size: 419, 298
+  orig: 1920, 1080
+  offset: 1305, 392
+  index: -1
+冲击波_00028
+  rotate: false
+  xy: 1269, 2
+  size: 408, 298
+  orig: 1920, 1080
+  offset: 1318, 392
+  index: -1

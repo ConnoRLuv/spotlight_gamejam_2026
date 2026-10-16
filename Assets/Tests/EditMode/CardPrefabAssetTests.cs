@@ -33,9 +33,15 @@ namespace SpotlightGameJam.Tests
                     new { Id = "HealCard", Count = 3 }, new { Id = "OverloadCard", Count = 3 } })
                     Assert.That(ordinary.Count(card => card.Data.cardId == entry.Id), Is.EqualTo(entry.Count), entry.Id);
                 var cybernetic = context.Cybernetic.AllCards.ToArray();
-                Assert.That(cybernetic.Length, Is.EqualTo(12));
-                foreach (var key in new[] { "BrainCard", "TorsoCard", "HandsCard", "LegsCard" })
-                    Assert.That(cybernetic.Count(card => card.Data.cardId == key), Is.EqualTo(3), key);
+                Assert.That(cybernetic.Length, Is.EqualTo(8));
+                foreach (var entry in new[] { new { Id = "PrometheusBrainCard", Count = 3 }, new { Id = "PrometheusTorsoCard", Count = 1 },
+                    new { Id = "PrometheusHandsCard", Count = 3 }, new { Id = "PrometheusLegsCard", Count = 1 } })
+                    Assert.That(cybernetic.Count(card => card.Data.cardId == entry.Id), Is.EqualTo(entry.Count), entry.Id);
+                var buffs = new SerializedObject(source).FindProperty("runBuffs");
+                Assert.That(buffs.arraySize, Is.EqualTo(1));
+                Assert.That(buffs.GetArrayElementAtIndex(0).objectReferenceValue,
+                    Is.SameAs(AssetDatabase.LoadAssetAtPath<RunBuffData>("Assets/GameData/Buffs/Prometheus.asset")));
+                Assert.That(bootstrap.Run.Buffs.Active, Is.Empty, "开局仅配置组合，不自动触发。");
                 Assert.That(context.Ordinary.Hand.Count, Is.EqualTo(3));
                 Assert.That(context.Cybernetic.Hand.Count, Is.EqualTo(1));
                 var nextOrdinary = context.Ordinary.Peek(3).ToArray();

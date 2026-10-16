@@ -11,6 +11,10 @@ namespace SpotlightGameJam
     {
         [Min(1)] public int count = 3;
         public override bool RequiresChoice => true;
+        public override string ChoiceTitle => "选择一张义体牌";
+        public override string ChoicePrompt => "选择一张义体牌；取消不消耗资源。";
+        /// <summary>通过统一选牌接口提供原脑机候选，保留旧单参数入口兼容调用。</summary>
+        public override IReadOnlyList<CardInstance> GetChoices(BattleContext context, CardInstance card) => GetChoices(context);
         /// <summary>检查配置是否合法；返回错误说明，无错误时返回空结果。</summary>
         public override string Validate() => count <= 0 ? "查看数量必须大于零。" : null;
 
@@ -22,7 +26,8 @@ namespace SpotlightGameJam
         /// <summary>确认选择仍在堆顶候选中，且移出使用牌后手牌容量允许取牌。</summary>
         public override bool CanExecuteRequest(BattleContext context, CardPlayRequest request) =>
             request.ChoiceId.HasValue && GetChoices(context).Any(card => card.Id == request.ChoiceId.Value) &&
-            context.Cybernetic.Hand.Count - (context.Cybernetic.Hand.Contains(request.Card) ? 1 : 0) < context.Cybernetic.Hand.Capacity;
+            (context.Cybernetic.Hand.IgnoreCapacity ||
+             context.Cybernetic.Hand.Count - (context.Cybernetic.Hand.Contains(request.Card) ? 1 : 0) < context.Cybernetic.Hand.Capacity);
 
         /// <summary>拒绝缺少候选牌身份的执行方式，提示调用方提交完整请求。</summary>
         public override void Execute(BattleContext context, CardInstance card, CombatantState target) =>

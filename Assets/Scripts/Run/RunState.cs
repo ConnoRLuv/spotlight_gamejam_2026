@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 namespace SpotlightGameJam
 {
     /// <summary>
@@ -13,9 +14,30 @@ namespace SpotlightGameJam
     {
         private readonly List<CardData> rewards = new List<CardData>();
         private readonly ReadOnlyCollection<CardData> rewardView;
+        private readonly List<CardData> transformedOrdinaryCards = new List<CardData>();
+        /// <summary>记录改造造成的永久移牌，不直接修改共享初始牌组配置。</summary>
+        internal void RecordOrdinaryTransformation(CardInstance card)
+        {
+            if (card == null || card.Data.category != CardCategory.Basic || card.ExpiresAtTurnEnd)
+                throw new ArgumentException("只能永久改造非临时基本牌。", nameof(card));
+            if (card.IsInitialHandReward) rewards.Remove(card.Data);
+            else transformedOrdinaryCards.Add(card.Data);
+        }
+        /// <summary>新战斗按每种配置的实际移除数量过滤初始牌堆，保留同配置其余牌。</summary>
+        public IEnumerable<CardData> ApplyOrdinaryTransformations(IEnumerable<CardData> initial)
+        {
+            if (initial == null) throw new ArgumentNullException(nameof(initial));
+            var removals = transformedOrdinaryCards.GroupBy(data => data).ToDictionary(group => group.Key, group => group.Count());
+            foreach (var data in initial)
+            {
+                if (data && removals.TryGetValue(data, out int count) && count > 0) { removals[data] = count - 1; continue; }
+                yield return data;
+            }
+        }
         public CombatantState Player { get; }
         public CyberneticLoadout Loadout { get; } = new CyberneticLoadout();
         public NewWorldSetBonusState SetBonuses { get; }
+        public RunBuffState Buffs { get; }
         public int Gold { get; private set; }
         // 普通冒险牌组中的唯一持久幻痛条目；战斗重建牌区时再次加入手牌，不写回共享资产。
         public CardData PhantomPain { get; private set; }
@@ -27,6 +49,7 @@ namespace SpotlightGameJam
             if (!rules || rules.Validate().Count > 0) throw new ArgumentException("战斗规则配置不合法。");
             Player = new CombatantState("player",rules.MaxHealth,rules.MaxSanity);
             SetBonuses = new NewWorldSetBonusState(Loadout);
+            Buffs = new RunBuffState(Loadout);
             Player.Changed += OnPlayerChanged;
             rewardView = rewards.AsReadOnly();
         }

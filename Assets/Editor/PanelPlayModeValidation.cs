@@ -10,190 +10,140 @@ using UnityEngine.UI;
 
 namespace SpotlightGameJam.Editor
 {
-    /// <summary>在真实 BattleScene 验证面板动画、悬停、动态弃牌和滚动，结束后退出 Play Mode。</summary>
+    /// <summary>验证只读牌堆接口、页签、动画、真实点击、滚动及战斗生命周期，不保存运行时修改。</summary>
     [InitializeOnLoad]
     public static class PanelPlayModeValidation
     {
         private const string PendingKey = "Spotlight.PanelPlayValidation";
-        private static int stage;
-        private static int frames;
-        private static double deadline;
-        private static double nextStep;
+        private static int stage, frames, nextFrame;
+        private static double deadline, nextStep;
         private static float originalTimeScale = 1;
-        private static int nextFrame;
-        /// <summary>在编辑器域重载后恢复尚未完成的面板验证流程。</summary>
+        private static readonly List<string> results = new List<string>();
+        /// <summary>域重载后继续本次验证，不在正常编辑时自动进入播放。</summary>
         static PanelPlayModeValidation() { if (SessionState.GetBool(PendingKey, false)) StartWaiting(); }
-
-        /// <summary>启动当前工具的 PlayMode 验证，准备进入自动检查流程。</summary>
+        /// <summary>菜单启动真实场景验证，结束后退出播放并恢复时间倍率。</summary>
         [MenuItem("Spotlight/Panels/Validate Play Mode")]
         public static void Run()
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode) throw new InvalidOperationException("请从编辑模式启动验证。");
-            if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().path != "Assets/Scenes/BattleScene.unity")
-                throw new InvalidOperationException("请先打开已接入弃牌面板的 BattleScene。");
-            SessionState.SetBool(PendingKey, true); StartWaiting(); EditorApplication.isPlaying = true;
+            if (UnityEngine.SceneManagement.SceneManager.GetActiveScene().path != "Assets/Scenes/BattleScene.unity") throw new InvalidOperationException("请先打开 BattleScene。");
+            SessionState.SetBool(PendingKey,true); StartWaiting(); EditorApplication.isPlaying=true;
         }
-        /// <summary>订阅编辑器更新，等待进入可执行验证的播放状态。</summary>
+        /// <summary>只订阅一次更新，设定超时以避免验证任务遗留。</summary>
         private static void StartWaiting()
         {
-            stage = frames = nextFrame = 0; nextStep = 0;
-            deadline = EditorApplication.timeSinceStartup + 75;
-            EditorApplication.update -= Tick; EditorApplication.update += Tick;
+            stage=frames=nextFrame=0; nextStep=0; results.Clear(); deadline=EditorApplication.timeSinceStartup+90;
+            EditorApplication.update-=Tick; EditorApplication.update+=Tick;
         }
-        /// <summary>推进自动验证步骤，等待界面更新并捕获失败信息。</summary>
+        /// <summary>逐帧推进实际 UI 验证，动画使用非缩放时间。</summary>
         private static void Tick()
         {
-            if (EditorApplication.timeSinceStartup > deadline) { Finish(false, "面板交互验证超时。"); return; }
-            if (!EditorApplication.isPlaying || EditorApplication.isCompiling) return;
-            // 后台编辑器更新不保证推进游戏帧；显式请求 PlayerLoop，并等待实际帧更新。
+            if(EditorApplication.timeSinceStartup>deadline){Finish(false,"验证超时");return;}
+            if(!EditorApplication.isPlaying||EditorApplication.isCompiling)return;
             EditorApplication.QueuePlayerLoopUpdate();
-            if (EditorApplication.timeSinceStartup < nextStep || Time.frameCount < nextFrame) return;
-            var hud = UnityEngine.Object.FindObjectOfType<BattleHUD>();
-            if (!hud || hud.Battle == null || ++frames < 4) return;
+            if(EditorApplication.timeSinceStartup<nextStep||Time.frameCount<nextFrame)return;
+            var hud=UnityEngine.Object.FindObjectOfType<BattleHUD>(); if(!hud||hud.Battle==null||++frames<4)return;
             try
             {
-                var panel = UnityEngine.Object.FindObjectOfType<DiscardPanel>(true);
-                Require(panel, "场景缺少弃牌面板。");
-                var group = panel.GetComponent<CanvasGroup>();
-                var references = hud.GetComponent<BattleSceneReferences>();
-                var pile = references.discardPileButton.gameObject;
-                var context = hud.Battle.Context;
-                switch (stage)
+                var draw=UnityEngine.Object.FindObjectOfType<DrawPilePanel>(true);
+                var discard=UnityEngine.Object.FindObjectOfType<DiscardPanel>(true);
+                Require(draw&&discard,"两个面板均存在");
+                var context=hud.Battle.Context; var refs=hud.GetComponent<BattleSceneReferences>();
+                switch(stage)
                 {
                     case 0:
-                        originalTimeScale = Time.timeScale; Time.timeScale = 0;
-                        Require(!panel.gameObject.activeSelf, "弃牌面板应初始隐藏。");
-                        AssertRaycast(pile);
-                        Enter(pile);
-                        Require(panel.IsVisible && group.alpha == 0, "悬停应从透明状态开始淡入。");
-                        Require(panel.DisplayedCards.Count == 0, "初始弃牌应为空。");
-                        Next(0.3); break;
-                    case 1:
-                        Require(Mathf.Approximately(group.alpha, 1), "游戏暂停时淡入也应完成。");
-                        panel.Hide(0.2f);
-                        Require(!group.blocksRaycasts && !panel.IsVisible, "开始淡出应立即停止交互。");
-                        panel.Show();
-                        Require(group.alpha == 1 && panel.gameObject.activeSelf, "0 秒显示应中断淡出并立即显示。");
-                        Next(0.3); break;
-                    case 2:
-                        Require(panel.gameObject.activeSelf, "旧淡出回调不应关闭重新打开的面板。");
-                        panel.Hide(); panel.Show(0.2f); panel.Hide();
-                        Require(!panel.gameObject.activeSelf && group.alpha == 0, "0 秒隐藏应中断淡入。");
-                        Enter(pile); Next(0.3); break;
-                    case 3:
-                        Exit(pile); Enter(panel.gameObject);
-                        Next(0.3); break;
-                    case 4:
-                        Require(panel.IsVisible, "从弃牌堆移入面板应保持显示。");
-                        Exit(panel.gameObject); Next(0.4); break;
-                    case 5:
-                        Require(!panel.gameObject.activeSelf, "离开触发区与面板后应淡出关闭。");
-                        // 布置足够手牌，通过真实出牌入口产生两种弃牌。
-                        context.Ordinary.Draw(9);
-                        var defense = context.Ordinary.Hand.Cards.First(card => card.Data.cardId == "DefenseCard");
-                        Require(hud.Battle.TryPlay(defense).Success, "防御测试牌出牌失败。");
-                        var torso = context.Cybernetic.Hand.Cards.FirstOrDefault(card => card.Data.cardId == "TorsoCard");
-                        if (torso == null)
+                        originalTimeScale=Time.timeScale;Time.timeScale=0;
+                        Require(!draw.IsVisible&&!discard.IsVisible,"面板初始隐藏");
+                        foreach(var button in new[]{refs.drawPileButton,refs.discardPileButton})
                         {
-                            torso = context.Cybernetic.DrawPile.Cards.First(card => card.Data.cardId == "TorsoCard");
-                            Require(context.Cybernetic.TakeFromDrawPile(torso), "义体测试牌入手失败。");
+                            ExecuteEvents.Execute(button.gameObject,new PointerEventData(EventSystem.current),ExecuteEvents.pointerEnterHandler);
+                            Click(button.gameObject);
                         }
-                        Require(hud.Battle.TryPlay(torso).Success, "义体测试牌出牌失败。");
-                        Enter(pile); Next(0.3); break;
-                    case 6:
-                        Require(panel.DisplayedCards.Count == 2 && panel.DisplayedCards.SequenceEqual(CurrentDiscards(context)), "展示应同时包含普通与义体弃牌实例。");
-                        Require(panel.GetComponentsInChildren<CardView>().All(view => !view.GetComponent<Button>().interactable), "预览牌不应允许出牌。");
-                        AssertRaycast(panel.gameObject);
-                        var heal = context.Ordinary.Hand.Cards.First(card => card.Data.cardId == "HealCard");
-                        Require(hud.Battle.TryPlay(heal).Success, "回复测试牌出牌失败。");
-                        Require(panel.DisplayedCards.Count == 3, "面板打开期间应随弃牌变化刷新。");
-                        // 此处只为布置溢出的展示数量，所有牌仍经 CardDeck 正常移区。
-                        foreach (var card in context.Ordinary.Hand.Cards.ToArray()) context.Ordinary.Discard(card);
-                        panel.RefreshCards(); hud.ShowOrdinary();
-                        // 等实际帧完成布局、滚动条和 HUD 更新后再导出截图。
-                        Next(0.1); break;
-                    case 7:
-                        var scroll = panel.GetComponent<ScrollRect>();
-                        Require(scroll.content.rect.height > scroll.viewport.rect.height, "多张弃牌应产生可滚动内容。");
-                        Capture(1920, 1080); Capture(1024, 768);
-                        var pointer = new PointerEventData(EventSystem.current) { scrollDelta = new Vector2(0, -1) };
-                        scroll.OnScroll(pointer);
-                        Require(scroll.verticalNormalizedPosition < 1, "鼠标滚轮应能浏览下方弃牌。");
-                        Require(hud.Battle.EndTurn(), "测试回合推进失败。");
-                        Require(context.Ordinary.DiscardPile.Count == 0 && panel.DisplayedCards.SequenceEqual(CurrentDiscards(context)), "洗回抽牌堆的牌应从当前弃牌预览移除。");
-                        Next(0.1); break;
-                    case 8:
-                        var oldBattle = hud.Battle;
-                        UnityEngine.Object.FindObjectOfType<GameBootstrap>().StartNewRun();
-                        Require(!panel.IsVisible, "新战斗应关闭旧弃牌预览。");
-                        Enter(pile); Require(panel.DisplayedCards.Count == 0, "新战斗应绑定新弃牌堆。");
-                        oldBattle.Context.Cybernetic.Discard(oldBattle.Context.Cybernetic.Hand.Cards[0]);
-                        oldBattle.EndTurn();
-                        Require(panel.DisplayedCards.Count == 0, "旧战斗事件不应影响新面板。");
-                        var hover = pile.GetComponent<DiscardPileHover>();
-                        hover.enabled = false;
-                        Require(!panel.gameObject.activeSelf, "禁用悬停入口应立即关闭预览。");
-                        hover.enabled = true;
-                        for (int i = 0; i < 5; i++) { Enter(pile); Exit(pile); }
-                        Next(0.5); break;
-                    case 9:
-                        Require(!panel.gameObject.activeSelf, "快速进出后不应残留面板或关闭任务。");
-                        Finish(true, "面板零秒显隐、暂停时淡入淡出、过渡反转、悬停移入/移出、动态弃牌、洗牌刷新、滚轮、新战斗重新绑定与快速进出验证通过。");
-                        break;
+                        Require(!draw.IsVisible&&!discard.IsVisible,"悬停和点击牌堆不打开面板");
+                        hud.ShowDrawPile();Require(draw.IsVisible&&draw.DisplayedCards.SequenceEqual(context.Ordinary.Peek(int.MaxValue)),"显式打开且堆顶优先展示");
+                        Next(.3);break;
+                    case 1:
+                        Require(Mathf.Approximately(draw.GetComponent<CanvasGroup>().alpha,1),"暂停时淡入正常完成");
+                        foreach(var size in new[]{new Vector2Int(1920,1080),new Vector2Int(1280,720),new Vector2Int(1024,768),new Vector2Int(2560,1080)})Capture(draw,size.x,size.y);
+                        var sanity=context.Player.Sanity;var ap=context.ActionPoints.Total;var original=context.Ordinary.DrawPile.Cards.ToArray();
+                        Click(draw.transform.Find("CyberneticTab").gameObject);
+                        Require(draw.DisplayedCards.SequenceEqual(context.Cybernetic.Peek(int.MaxValue)),"义体页签展示独立牌堆");
+                        Click(draw.transform.Find("OrdinaryTab").gameObject);
+                        foreach(var view in draw.GetComponentsInChildren<CardView>())Click(view.gameObject);
+                        Require(context.Player.Sanity==sanity&&context.ActionPoints.Total==ap&&context.Ordinary.DrawPile.Cards.SequenceEqual(original),"浏览、切页和点击预览不扣资源或移动牌");
+                        hud.ShowDiscardPile(0);Require(!draw.IsVisible&&discard.IsVisible&&discard.DisplayedCards.Count==0,"面板互斥及空弃牌状态");
+                        discard.Hide(.2f);Require(!discard.GetComponent<CanvasGroup>().blocksRaycasts,"淡出开始即停止射线");discard.Show(0);
+                        Next(.3);break;
+                    case 2:
+                        Require(discard.IsVisible,"旧淡出回调不关闭重新打开的面板");
+                        context.Ordinary.Draw(9);
+                        var defense=context.Ordinary.Hand.Cards.First(card=>card.Data.cardId=="DefenseCard");
+                        Require(hud.Battle.TryPlay(defense).Success,"正常出牌产生普通弃牌");
+                        var torso=context.Cybernetic.Hand.Cards.FirstOrDefault(card=>card.Data.cardId=="TorsoCard");
+                        if(torso==null){torso=context.Cybernetic.DrawPile.Cards.First(card=>card.Data.cardId=="TorsoCard");Require(context.Cybernetic.TakeFromDrawPile(torso),"准备义体测试手牌");}
+                        Require(hud.Battle.TryPlay(torso).Success,"正常出牌产生义体弃牌");
+                        Require(discard.DisplayedCards.SequenceEqual(context.Ordinary.DiscardPile.Cards.Reverse()),"打开期间实时更新普通弃牌");
+                        Click(discard.transform.Find("CyberneticTab").gameObject);
+                        Require(discard.DisplayedCards.SequenceEqual(context.Cybernetic.DiscardPile.Cards.Reverse()),"弃牌义体页签正确");
+                        Click(discard.transform.Find("OrdinaryTab").gameObject);
+                        foreach(var card in context.Ordinary.Hand.Cards.ToArray())context.Ordinary.Discard(card);
+                        discard.RefreshCards();Next(.1);break;
+                    case 3:
+                        var scroll=discard.GetComponent<ScrollRect>();
+                        Require(scroll.content.rect.height>scroll.viewport.rect.height,"多张牌形成滚动列表");
+                        foreach(var size in new[]{new Vector2Int(1920,1080),new Vector2Int(1024,768)})Capture(discard,size.x,size.y);
+                        scroll.OnScroll(new PointerEventData(EventSystem.current){scrollDelta=new Vector2(0,-1)});
+                        Require(scroll.verticalNormalizedPosition<1,"鼠标滚轮可以浏览");
+                        Require(hud.Battle.EndTurn(),"推进真实回合");
+                        Require(discard.DisplayedCards.SequenceEqual(context.Ordinary.DiscardPile.Cards.Reverse()),"重新洗牌后预览更新");
+                        Click(discard.transform.Find("CloseButton").gameObject);
+                        Require(!discard.IsVisible&&!discard.GetComponent<CanvasGroup>().blocksRaycasts,"关闭按钮立即停止交互");
+                        Next(.3);break;
+                    case 4:
+                        Require(!discard.gameObject.activeSelf,"淡出结束停用对象");
+                        var old=hud.Battle;UnityEngine.Object.FindObjectOfType<GameBootstrap>().StartNewRun();
+                        Require(!draw.IsVisible&&!discard.IsVisible,"新战斗关闭两个旧面板");hud.ShowDiscardPile(0);
+                        old.Context.Cybernetic.Discard(old.Context.Cybernetic.Hand.Cards[0]);old.EndTurn();
+                        Require(discard.DisplayedCards.Count==0,"旧战斗事件不影响新预览");
+                        hud.enabled=false;Require(!draw.IsVisible&&!discard.IsVisible,"停用 HUD 关闭并解绑");
+                        hud.enabled=true;hud.ShowDrawPile(0);Require(draw.IsVisible,"重新启用绑定当前战斗");
+                        hud.ClosePilePanels(0);Require(!draw.gameObject.activeSelf&&!discard.gameObject.activeSelf,"统一关闭接口正确");
+                        hud.ShowDrawPile(0);var current=hud.Battle.Context;
+                        DamageResolver.Apply(current,current.Player,current.Enemies[0],20000);
+                        Require(current.IsFinished&&!draw.IsVisible&&!discard.IsVisible,"战斗结束关闭面板");
+                        Finish(true,"只读牌堆面板交互及生命周期验证通过");break;
                 }
             }
-            catch (Exception exception) { Debug.LogException(exception); Finish(false, exception.ToString()); }
+            catch(Exception e){Debug.LogException(e);Finish(false,e.ToString());}
         }
-        /// <summary>返回当前普通与义体弃牌实例，作为界面预览的对照数据。</summary>
-        private static IEnumerable<CardInstance> CurrentDiscards(BattleContext context) => context.Ordinary.DiscardPile.Cards.Concat(context.Cybernetic.DiscardPile.Cards);
-        /// <summary>安排下一验证步骤，留出帧间隔使界面和战斗状态完成更新。</summary>
-        private static void Next(double seconds)
-        { stage++; nextStep = EditorApplication.timeSinceStartup + seconds; nextFrame = Time.frameCount + 3; }
-        /// <summary>向指定对象发送鼠标进入事件，模拟悬停操作。</summary>
-        private static void Enter(GameObject target) { ExecuteEvents.Execute(target, new PointerEventData(EventSystem.current), ExecuteEvents.pointerEnterHandler); }
-        /// <summary>向指定对象发送鼠标离开事件，模拟离开触发区域。</summary>
-        private static void Exit(GameObject target) { ExecuteEvents.Execute(target, new PointerEventData(EventSystem.current), ExecuteEvents.pointerExitHandler); }
-        /// <summary>检查验证条件，不满足时抛出包含原因的异常。</summary>
-        private static void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
-        /// <summary>检查指定屏幕位置的射线结果，确认目标控件可接收鼠标事件。</summary>
-        private static void AssertRaycast(GameObject target)
+        /// <summary>发送左键点击，复用真实 Button 的可交互校验和监听。</summary>
+        private static void Click(GameObject owner) => ExecuteEvents.Execute(owner,new PointerEventData(EventSystem.current){button=PointerEventData.InputButton.Left},ExecuteEvents.pointerClickHandler);
+        /// <summary>等待非缩放时间和实际游戏帧，不阻塞编辑器。</summary>
+        private static void Next(double seconds){stage++;nextStep=EditorApplication.timeSinceStartup+seconds;nextFrame=Time.frameCount+2;}
+        /// <summary>记录通过项，失败抛出精确说明。</summary>
+        private static void Require(bool passed,string message){if(!passed)throw new InvalidOperationException(message);results.Add("PASS "+message);}
+        /// <summary>导出不同分辨率并验证网格不会横向溢出。</summary>
+        private static void Capture(PilePreviewPanel panel,int width,int height)
         {
-            Canvas.ForceUpdateCanvases();
-            var rect = target.GetComponent<RectTransform>();
-            var pointer = new PointerEventData(EventSystem.current) { position = RectTransformUtility.WorldToScreenPoint(Camera.main, rect.TransformPoint(rect.rect.center)) };
-            var hits = new List<RaycastResult>(); EventSystem.current.RaycastAll(pointer, hits);
-            Require(hits.Count > 0 && (hits[0].gameObject == target || hits[0].gameObject.transform.IsChildOf(target.transform)), "UI 射线无法命中 " + target.name);
-        }
-        /// <summary>结束验证并记录结果，解除更新订阅及恢复编辑器状态。</summary>
-        private static void Finish(bool success, string message)
-        {
-            EditorApplication.update -= Tick; SessionState.SetBool(PendingKey, false);
-            Time.timeScale = originalTimeScale;
-            Directory.CreateDirectory("Logs/Panels"); File.WriteAllText("Logs/Panels/play-mode-validation.txt", (success ? "PASS\n" : "FAIL\n") + message);
-            Debug.Log(message);
-            if (Application.isBatchMode) EditorApplication.Exit(success ? 0 : 1);
-            else EditorApplication.isPlaying = false;
-            stage = frames = 0;
-        }
-        /// <summary>导出当前界面截图，供人工检查布局与交互结果。</summary>
-        private static void Capture(int width, int height)
-        {
-            var camera = Camera.main; var previous = camera.targetTexture; var active = RenderTexture.active;
-            var target = new RenderTexture(width, height, 24); var image = new Texture2D(width, height, TextureFormat.RGB24, false);
+            var camera=Camera.main;var previous=camera.targetTexture;var active=RenderTexture.active;float aspect=camera.aspect;
+            var target=new RenderTexture(width,height,24);var image=new Texture2D(width,height,TextureFormat.RGB24,false);
             try
             {
-                camera.targetTexture = target; Canvas.ForceUpdateCanvases();
-                var hud = UnityEngine.Object.FindObjectOfType<BattleHUD>();
-                if (hud) hud.SendMessage("LateUpdate", SendMessageOptions.DontRequireReceiver);
-                Canvas.ForceUpdateCanvases(); camera.Render(); RenderTexture.active = target;
-                image.ReadPixels(new Rect(0, 0, width, height), 0, 0); image.Apply();
-                Directory.CreateDirectory("Logs/Panels"); File.WriteAllBytes("Logs/Panels/DiscardPanel-" + width + "x" + height + ".png", image.EncodeToPNG());
+                camera.targetTexture=target;camera.aspect=(float)width/height;Canvas.ForceUpdateCanvases();
+                panel.SendMessage("LateUpdate",SendMessageOptions.DontRequireReceiver);Canvas.ForceUpdateCanvases();
+                var scroll=panel.GetComponent<ScrollRect>();var grid=scroll.content.GetComponent<GridLayoutGroup>();
+                Require(grid.constraintCount*grid.cellSize.x+(grid.constraintCount-1)*grid.spacing.x+grid.padding.horizontal<=scroll.viewport.rect.width+1,"网格适应 "+width+"x"+height);
+                camera.Render();RenderTexture.active=target;image.ReadPixels(new Rect(0,0,width,height),0,0);image.Apply();
+                Directory.CreateDirectory("Logs/PilePanels");File.WriteAllBytes("Logs/PilePanels/"+panel.GetType().Name+"-"+width+"x"+height+".png",image.EncodeToPNG());
             }
-            finally
-            {
-                camera.targetTexture = previous; RenderTexture.active = active; target.Release();
-                UnityEngine.Object.DestroyImmediate(target); UnityEngine.Object.DestroyImmediate(image); Canvas.ForceUpdateCanvases();
-            }
+            finally{camera.targetTexture=previous;camera.aspect=aspect;RenderTexture.active=active;target.Release();UnityEngine.Object.DestroyImmediate(target);UnityEngine.Object.DestroyImmediate(image);Canvas.ForceUpdateCanvases();}
+        }
+        /// <summary>清理验证回调、恢复时间倍率并退出播放，不保存演示状态。</summary>
+        private static void Finish(bool passed,string message)
+        {
+            EditorApplication.update-=Tick;SessionState.SetBool(PendingKey,false);Time.timeScale=originalTimeScale;
+            Directory.CreateDirectory("Logs/PilePanels");File.WriteAllLines("Logs/PilePanels/play-mode-validation.txt",new[]{passed?"PASS":"FAIL",message}.Concat(results));
+            if(Application.isBatchMode)EditorApplication.Exit(passed?0:1);else EditorApplication.isPlaying=false;
         }
     }
 }

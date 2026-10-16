@@ -43,10 +43,11 @@ namespace SpotlightGameJam
                 Context.CheckOutcome();
                 if (!Context.IsFinished)
                 {
+                    Context.Run.Buffs.BeginBattle();
                     // 奖励持有配置引用，开战才创建实例；超出容量的奖励进入弃牌堆。
                     foreach (var data in Context.Run.InitialHandRewards)
                     {
-                        var card = new CardInstance(data);
+                        var card = new CardInstance(data) { IsInitialHandReward = true };
                         if (!Context.Ordinary.Hand.TryAdd(card)) Context.Ordinary.DiscardPile.TryAdd(card);
                     }
                     turns.BeginTurn(Context);
@@ -72,13 +73,22 @@ namespace SpotlightGameJam
         }
         /// <summary>为界面返回候选快照；确认时仍须提交请求并重新验证。</summary>
         public IReadOnlyList<CardInstance> GetCyberneticChoices(CardInstance card)
+            => GetCardChoices(card);
+        /// <summary>统一返回脑机取牌或躯干改造候选，确认时仍按实例重新校验。</summary>
+        public IReadOnlyList<CardInstance> GetCardChoices(CardInstance card)
         {
             if (Context.IsFinished || Context.IsResolving || Context.State != BattleState.PlayerAction ||
                 card == null || !Context.Cybernetic.Hand.Contains(card) || card.Data.Validate().Count > 0)
                 return Array.Empty<CardInstance>();
-            var effect = card.Data.effects.OfType<CyberneticPeekEffectData>().FirstOrDefault();
-            return effect == null ? Array.Empty<CardInstance>() : effect.GetChoices(Context);
+            var effect = card.Data.effects.FirstOrDefault(value => value.RequiresChoice);
+            return effect == null ? Array.Empty<CardInstance>() : effect.GetChoices(Context, card);
         }
+        /// <summary>返回当前选牌效果的操作说明，不把具体义体规则写入界面。</summary>
+        public string GetCardChoicePrompt(CardInstance card) =>
+            card?.Data.effects.FirstOrDefault(effect => effect.RequiresChoice)?.ChoicePrompt ?? "请选择卡牌。";
+        /// <summary>返回牌效定义的选牌标题，共用面板不固定为义体牌。</summary>
+        public string GetCardChoiceTitle(CardInstance card) =>
+            card?.Data.effects.FirstOrDefault(effect => effect.RequiresChoice)?.ChoiceTitle ?? "选择一张卡牌";
         /// <summary>按需支付 1 AP 生成一张仅存在本回合的免费攻击；失败不修改资源。</summary>
         public CardPlayResult TryConvertApToAttack()
         {
@@ -89,7 +99,7 @@ namespace SpotlightGameJam
             if (Context.TurnEffects.ConversionAttack.Validate().Count > 0)
                 return new CardPlayResult(CardPlayFailure.InvalidConfiguration,"转换攻击配置已失效。");
             if (!Context.ActionPoints.CanSpend(1)) return new CardPlayResult(CardPlayFailure.InsufficientAp,"需要 1 AP。");
-            if (Context.Ordinary.Hand.Count >= Context.Ordinary.Hand.Capacity) return new CardPlayResult(CardPlayFailure.HandFull,"普通手牌已满。");
+            if (!Context.Ordinary.CanAddToHand()) return new CardPlayResult(CardPlayFailure.HandFull,"普通手牌已满。");
             Context.IsResolving = true;
             try
             {

@@ -4,7 +4,7 @@ using System.Linq;
 using UnityEngine;
 namespace SpotlightGameJam
 {
-    /// <summary>探索入口的共享配置：基础牌、规则、可选义体、默认选择及全局套装。</summary>
+    /// <summary>探索入口共享配置：普通牌、义体及两套独立的组合效果。</summary>
     [CreateAssetMenu(menuName = "Spotlight/探索/出发配置")]
     public sealed class AdventureSetupData : ScriptableObject
     {
@@ -14,6 +14,7 @@ namespace SpotlightGameJam
         public CyberneticData[] availableCybernetics = Array.Empty<CyberneticData>();
         public CyberneticData[] defaultCybernetics = Array.Empty<CyberneticData>();
         public NewWorldSetBonusData[] setBonuses = Array.Empty<NewWorldSetBonusData>();
+        public RunBuffData[] buffs = Array.Empty<RunBuffData>();
         public int randomSeed = 1;
         /// <summary>校验实际带入的选择，允许零至四个部位，不把未装备当作错误。</summary>
         public IReadOnlyList<string> ValidateSelection(IEnumerable<CyberneticData> selection)
@@ -44,16 +45,20 @@ namespace SpotlightGameJam
             if (setBonuses == null) errors.Add("套装列表不能为空引用。");
             else foreach (var bonus in setBonuses)
                 if (!bonus) errors.Add("套装含空引用。"); else errors.AddRange(bonus.Validate());
+            if (buffs == null) errors.Add("Buff 列表不能为空引用。");
+            else foreach (var buff in buffs)
+                if (!buff) errors.Add("Buff 含空引用。"); else errors.AddRange(buff.Validate());
             return errors;
         }
-        /// <summary>创建独立探索牌组及可触发套装配置，不因携带完整四部位而自动激活。</summary>
+        /// <summary>创建独立探索牌组及可触发 buff 配置，不因携带完整四部位而自动激活。</summary>
         public RunState CreateRun(IEnumerable<CyberneticData> selection)
         {
             var chosen = selection?.ToArray();
             var errors = ValidateSelection(chosen);
             if (errors.Count > 0) throw new ArgumentException(string.Join("\n", errors));
             var run = new RunState(rules);
-            foreach (var data in chosen) run.Loadout.Equip(new CyberneticInstance(data));
+            foreach (var data in chosen) run.Loadout.AddInitial(data);
+            run.Buffs.Configure(buffs);
             run.SetBonuses.Configure(setBonuses);
             return run;
         }

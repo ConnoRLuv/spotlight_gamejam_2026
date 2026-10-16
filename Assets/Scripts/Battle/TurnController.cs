@@ -18,7 +18,10 @@ namespace SpotlightGameJam
             context.CheckOutcome();
             if (context.IsFinished) return;
             context.SetState(BattleState.TurnStart);
+            context.Run.Buffs.BeginTurn();
             TurnNumber++;
+            bool discardFirst = context.TurnEffects.DrawFromDiscardNextTurn;
+            context.TurnEffects.DrawFromDiscardNextTurn = false;
             context.TurnEffects.BeginTurn();
             context.SetNoHandLimit(false);
             // 在玩家回合开始清除，保证上一回合防御可先抵挡敌人行动。
@@ -30,8 +33,8 @@ namespace SpotlightGameJam
             context.ActionPoints.BeginTurn(allowance); context.Usage.BeginTurn();
             // 上一场留下的零理智也会在本场首回合触发；锁定牌计入普通手牌容量。
             context.EnsurePhantomPain();
-            context.Ordinary.Draw(context.Rules.OrdinaryDraw);
-            context.Cybernetic.Draw(context.Rules.CyberneticDraw);
+            context.Ordinary.Draw(context.Rules.OrdinaryDraw, discardFirst);
+            context.Cybernetic.Draw(context.Rules.CyberneticDraw, discardFirst);
             context.SetState(BattleState.PlayerAction);
         }
         /// <summary>
@@ -41,6 +44,7 @@ namespace SpotlightGameJam
         {
             // 临时 AP 在结束玩家行动时失效，不等到敌人行动之后才清除。
             context.ActionPoints.EndTurn();
+            context.Run.Buffs.EndTurn();
             context.Ordinary.RemoveTurnCards(); context.Cybernetic.RemoveTurnCards();
             context.TurnEffects.EndPlayerAction();
             if (context.TurnEffects.ExtraTurns > 0)
