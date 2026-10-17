@@ -22,7 +22,7 @@ namespace SpotlightGameJam.Editor
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode) throw new InvalidOperationException("请先退出运行模式。");
             var art = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/UI/Shop_Popup.prefab");
-            font = AssetDatabase.LoadAssetAtPath<Font>("Assets/Fonts/NotoSansCJKsc-Regular.otf");
+            font = AssetDatabase.LoadAssetAtPath<Font>("Assets/Fonts/荆南俊俊体.ttf");
             if (!art || !font) throw new InvalidOperationException("缺少商店美术或中文字体。");
             var root = PrefabUtility.LoadPrefabContents(PanelPath);
             try
@@ -42,20 +42,31 @@ namespace SpotlightGameJam.Editor
                 var heal = frame.Find("HealButton").GetComponent<Button>();
                 SkinButton(heal, art.transform.Find("HealButton")); Place((RectTransform)heal.transform, new Rect(62, 102, 211, 84));
                 // 图中“治疗”已包含在按钮原图里，费用与恢复量放到右侧，避免重复叠字。
-                var healLabel = heal.GetComponentInChildren<Text>(true);
-                Style(healLabel, 19, Ink); Place(healLabel.rectTransform, new Rect(220, 0, 185, 70), 211, 84);
-                PlaceText(frame.Find("HealthText"), new Rect(283, 176, 190, 25), 19, Ink);
-                PlaceText(frame.Find("CurrencyText"), new Rect(552, 97, 245, 28), 20, Cyan);
-                PlaceText(frame.Find("ShopTitle"), new Rect(805, 97, 245, 28), 23, Ink);
-                PlaceText(frame.Find("RepairTitle"), new Rect(112, 209, 165, 24), 20, Ink);
-                PlaceText(frame.Find("RepairHint"), new Rect(277, 210, 165, 22), 14, Cyan);
-                frame.Find("RepairHint").GetComponent<Text>().text = "点击义体修复 +1";
-                PlaceText(frame.Find("PrototypeHint"), new Rect(536, 647, 510, 43), 16, Ink);
+                RemoveLabel(heal.transform, "Label");
+                RemoveLabel(frame, "HealthText");
+                // 两行图标与数值独立于治疗按钮，不受按钮禁用颜色影响。
+                var healthIcon = EnsureImage(EnsureRect(frame, "HealingHealthIcon"));
+                Place(healthIcon.rectTransform, new Rect(307, 106, 38, 38));
+                healthIcon.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/UI/Healthicon.png");
+                healthIcon.color = Color.white; healthIcon.preserveAspect = true; healthIcon.raycastTarget = false;
+                var healCoin = EnsureImage(EnsureRect(frame, "HealingCurrencyIcon"));
+                Place(healCoin.rectTransform, new Rect(307, 150, 38, 38));
+                healCoin.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/UI/Goldicon.png");
+                healCoin.color = Color.white; healCoin.preserveAspect = true; healCoin.raycastTarget = false;
+                var amount = EnsureText(EnsureRect(frame, "HealingAmount")); amount.text = "+" + ShopService.HealingAmount;
+                PlaceText(amount.transform, new Rect(350, 106, 92, 38), 22, Ink);
+                var price = EnsureText(EnsureRect(frame, "HealingPrice")); price.text = ShopService.HealingPrice.ToString();
+                PlaceText(price.transform, new Rect(350, 150, 92, 38), 22, Ink);
+                foreach (string label in new[] { "CurrencyText", "ShopTitle", "RepairTitle", "RepairHint" }) RemoveLabel(frame, label);
+                RemoveLabel(frame, "PrototypeHint");
                 var exit = frame.Find("ExitButton").GetComponent<Button>();
                 SkinButton(exit, art.transform.Find("CancelButton")); Place((RectTransform)exit.transform, new Rect(1175, 10, 82, 83));
                 exit.GetComponentInChildren<Text>(true).gameObject.SetActive(false);
 
                 var fields = new SerializedObject(root.GetComponent<ShopPanel>());
+                fields.FindProperty("healingAmountText").objectReferenceValue = amount;
+                fields.FindProperty("healingPriceText").objectReferenceValue = price;
+                fields.ApplyModifiedPropertiesWithoutUndo();
                 var repairs = fields.FindProperty("repairSlots");
                 for (int i = 0; i < repairs.arraySize; i++)
                     StyleRepair((RectTransform)repairs.GetArrayElementAtIndex(i).objectReferenceValue, i);
@@ -63,13 +74,41 @@ namespace SpotlightGameJam.Editor
                 for (int i = 0; i < products.arraySize; i++)
                 {
                     var slot = (RectTransform)products.GetArrayElementAtIndex(i).objectReferenceValue;
-                    Place(slot, new Rect(551 + i % 3 * 174, 140 + i / 3 * 238, 153, 216));
+                    // 卡面下方不再重复显示部位，保留价格与购买状态。
+                    RemoveLabel(slot, "Part");
+                    // 复用配置中的完整卡面美术，保留 CardView 以继续支持无美术商品的模板展示。
+                    var face = EnsureImage(EnsureRect(slot.Find("CardPreview"), "ArtFace"));
+                    face.rectTransform.anchorMin = Vector2.zero; face.rectTransform.anchorMax = Vector2.one;
+                    face.rectTransform.offsetMin = face.rectTransform.offsetMax = Vector2.zero;
+                    face.preserveAspect = true; face.raycastTarget = false;
+                    face.transform.SetAsLastSibling();
+                    var cardRoot = slot.Find("CardPreview");
+                    if (!cardRoot.GetComponent<ShopRepairHoldPreview>()) cardRoot.gameObject.AddComponent<ShopRepairHoldPreview>();
+                    // 独立透明点击区不受模板底图停用影响，也不覆盖下方购买按钮。
+                    var hitArea = EnsureImage(EnsureRect(cardRoot, "HoldHitArea"));
+                    hitArea.rectTransform.anchorMin = Vector2.zero; hitArea.rectTransform.anchorMax = Vector2.one;
+                    hitArea.rectTransform.offsetMin = hitArea.rectTransform.offsetMax = Vector2.zero;
+                    hitArea.color = Color.clear; hitArea.raycastTarget = true; hitArea.transform.SetAsLastSibling();
+                    Place(slot, new Rect(565 + i % 3 * 174, 114 + i / 3 * 250, 153, 246));
+                    // 收紧卡面与价格、按钮的距离，六个商品共享一致的基线。
+                    Place((RectTransform)slot.Find("Price"), new Rect(4, 180, 145, 30), 153, 246);
+                    Place((RectTransform)slot.Find("BuyButton"), new Rect(7, 212, 139, 30), 153, 246);
+                    // 无完整美术的模板也为 22 号字体提供足够行高。
+                    Place((RectTransform)cardRoot.Find("Name"), new Rect(8, 8, 164, 56), 180, 255);
+                    Place((RectTransform)cardRoot.Find("Cost"), new Rect(8, 66, 164, 32), 180, 255);
+                    Place((RectTransform)cardRoot.Find("ColorPlaceholder"), new Rect(10, 102, 160, 12), 180, 255);
+                    Place((RectTransform)cardRoot.Find("Description"), new Rect(10, 119, 160, 92), 180, 255);
+                    Place((RectTransform)cardRoot.Find("Source"), new Rect(8, 219, 164, 32), 180, 255);
                     slot.GetComponent<Image>().color = Color.clear;
                     foreach (var label in slot.GetComponentsInChildren<Text>(true))
                         if (!label.GetComponentInParent<CardView>()) Style(label, label.name == "Label" ? 17 : 18, Ink);
                     var button = slot.Find("BuyButton").GetComponent<Button>();
                     button.GetComponent<Image>().color = new Color(.12f, .30f, .37f);
                 }
+                // 统一剩余文字组件；完整卡图中的字属于美术图片本身。
+                foreach (var label in root.GetComponentsInChildren<Text>(true)) Style(label, 22, label.color);
+                // 治疗数值按当前界面调整单独放大，其他商店文字维持 22 号。
+                Style(amount, 28, Ink); Style(price, 28, Ink);
                 frame.anchorMin = anchorMin; frame.anchorMax = anchorMax;
                 PrefabUtility.SaveAsPrefabAsset(root, PanelPath);
             }
@@ -82,24 +121,31 @@ namespace SpotlightGameJam.Editor
         {
             Place(slot, new Rect(118 + index % 2 * 168, 260 + index / 2 * 187, 135, 183));
             slot.GetComponent<Image>().color = Color.clear;
-            PlaceText(slot.Find("Part"), new Rect(6, 6, 123, 22), 18, Cyan, 135, 183);
-            PlaceText(slot.Find("Name"), new Rect(4, 96, 127, 22), 16, Ink, 135, 183);
-            var icon = EnsureRect(slot, "Icon"); Place(icon, new Rect(33, 31, 69, 62), 135, 183);
+            RemoveLabel(slot, "Part"); RemoveLabel(slot, "Name");
+            var icon = EnsureRect(slot, "Icon"); Place(icon, new Rect(17, 17, 101, 94), 135, 183);
             var iconImage = EnsureImage(icon); iconImage.preserveAspect = true; iconImage.raycastTarget = false; iconImage.enabled = false;
             var symbol = EnsureRect(slot, "Symbol"); Place(symbol, new Rect(12, 32, 111, 57), 135, 183);
             Style(EnsureText(symbol), 31, Ink);
-            var backdrop = EnsureRect(slot, "DurabilityBackdrop"); Place(backdrop, new Rect(-2, 143, 144, 34), 135, 183);
+            var backdrop = EnsureRect(slot, "DurabilityBackdrop"); Place(backdrop, new Rect(-2, 143, 144, 28), 135, 183);
             var backdropImage = EnsureImage(backdrop); backdropImage.color = Blue; backdropImage.raycastTarget = false;
-            PlaceText(slot.Find("Durability"), new Rect(0, 143, 140, 18), 16, Ink, 135, 183);
+            PlaceText(slot.Find("Durability"), new Rect(0, 143, 80, 27), 22, Ink, 135, 183);
+            var rowFont = AssetDatabase.LoadAssetAtPath<Font>("Assets/Fonts/荆南俊俊体.ttf");
+            slot.Find("Durability").GetComponent<Text>().font = rowFont;
+            var coin = EnsureImage(EnsureRect(slot, "RepairCurrencyIcon"));
+            Place(coin.rectTransform, new Rect(81, 147, 18, 19), 135, 183);
+            coin.sprite = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/UI/Goldicon.png");
+            coin.color = Color.white; coin.preserveAspect = true; coin.raycastTarget = false;
             slot.Find("Durability").SetAsLastSibling();
             var repair = slot.Find("RepairButton").GetComponent<Button>();
+            if (!repair.GetComponent<ShopRepairHoldPreview>()) repair.gameObject.AddComponent<ShopRepairHoldPreview>();
             Place((RectTransform)repair.transform, new Rect(0, 0, 135, 139), 135, 183);
             repair.GetComponent<Image>().color = Color.clear;
-            var fee = repair.GetComponentInChildren<Text>(true); Style(fee, 13, Cyan);
-            Place(fee.rectTransform, new Rect(-5, 162, 150, 15), 135, 139);
+            var fee = repair.GetComponentInChildren<Text>(true); Style(fee, 22, Ink);
+            fee.font = rowFont;
+            Place(fee.rectTransform, new Rect(101, 143, 39, 27), 135, 139);
             repair.transform.SetAsLastSibling();
             var cycle = slot.Find("CycleButton");
-            Place((RectTransform)cycle, new Rect(11, 118, 113, 19), 135, 183);
+            Place((RectTransform)cycle, new Rect(11, 108, 113, 28), 135, 183);
             cycle.GetComponent<Image>().color = new Color(.1f, .23f, .31f);
             Style(cycle.GetComponentInChildren<Text>(true), 13, Ink); cycle.SetAsLastSibling();
         }
@@ -114,6 +160,13 @@ namespace SpotlightGameJam.Editor
             EditorUtility.CopySerialized(source.GetComponent<ButtonPressEffect>(), effect);
             var colors = button.colors; colors.normalColor = Color.white; colors.disabledColor = new Color(.42f, .48f, .51f);
             button.colors = colors;
+        }
+
+        /// <summary>删除已移除的静态标签，允许对新版预制体重复执行构建。</summary>
+        private static void RemoveLabel(Transform parent, string name)
+        {
+            var child = parent.Find(name);
+            if (child) UnityEngine.Object.DestroyImmediate(child.gameObject);
         }
 
         /// <summary>设置已有文本位置和样式，不替换对象或序列化引用。</summary>
@@ -132,7 +185,7 @@ namespace SpotlightGameJam.Editor
         private static void Style(Text text, int size, Color color)
         {
             text.font = font; text.fontSize = size; text.color = color; text.alignment = TextAnchor.MiddleCenter;
-            text.raycastTarget = false; text.resizeTextForBestFit = true; text.resizeTextMinSize = 9; text.resizeTextMaxSize = size;
+            text.raycastTarget = false; text.resizeTextForBestFit = false;
             text.horizontalOverflow = HorizontalWrapMode.Wrap; text.verticalOverflow = VerticalWrapMode.Truncate;
         }
 

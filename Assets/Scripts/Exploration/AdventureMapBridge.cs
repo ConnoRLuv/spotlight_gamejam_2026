@@ -68,6 +68,8 @@ namespace SpotlightGameJam
         private void OnNodeEntered(MapNode node)
         {
             if (!session || session.Run == null || session.Map != generator.RunState || node == null) return;
+            // 在所有打开面板的回调之前选定商店身份，同节点重开不刷新限购。
+            if (node.TypeKey == NodeTypeKeys.Shop) session.Run.Shop.Enter("map:" + session.Map.Graph.Seed + ":node:" + node.Id);
             NodeRequested?.Invoke(node);
             switch (node.TypeKey)
             {

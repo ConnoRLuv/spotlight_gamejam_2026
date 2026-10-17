@@ -9,14 +9,13 @@ namespace SpotlightGameJam.UI
     /// <summary>展示探索资源和义体库存，将购买、修复及回血交给商店服务结算。</summary>
     public sealed class ShopPanel : BasePanel
     {
-        [SerializeField] private Text healthText;
-        [SerializeField] private Text currencyText;
+        [SerializeField] private Text healingAmountText;
+        [SerializeField] private Text healingPriceText;
         [SerializeField] private Button exitButton;
         [SerializeField] private Button healButton;
         [SerializeField] private RectTransform[] repairSlots = Array.Empty<RectTransform>();
         [SerializeField] private RectTransform[] productSlots = Array.Empty<RectTransform>();
         [SerializeField] private CyberneticData[] productDefinitions = Array.Empty<CyberneticData>();
-        [SerializeField] private Text transactionText;
         private RunState run;
         private ShopService service;
         private RectTransform[] productCards;
@@ -65,7 +64,6 @@ namespace SpotlightGameJam.UI
             run = value;
             service = run == null ? null : new ShopService(run);
             repairSources = new CyberneticInstance[repairSlots.Length];
-            if (transactionText) transactionText.text = "购买获得 1 张牌，下场战斗入堆；修复每次恢复 1 点耐久。";
             if (isActiveAndEnabled) SubscribeRun();
             Refresh();
         }
@@ -91,13 +89,11 @@ namespace SpotlightGameJam.UI
         /// <summary>刷新当前玩家资源、实际库存与商品交易资格。</summary>
         private void Refresh()
         {
-            if (healthText) healthText.text = run == null ? "生命 — / —" : "生命 " + run.Player.Health + " / " + run.Player.MaxHealth;
-            if (currencyText) currencyText.text = run == null ? "塞勒币 —" : "塞勒币 " + run.Gold;
+            if (healingAmountText) healingAmountText.text = "+" + ShopService.HealingAmount;
+            if (healingPriceText) healingPriceText.text = ShopService.HealingPrice.ToString();
             if (healButton)
             {
                 healButton.interactable = service != null && service.CanHeal(out _);
-                var label = healButton.GetComponentInChildren<Text>(true);
-                if (label) label.text = "回血 +" + ShopService.HealingAmount + "\n" + ShopService.HealingPrice + " 塞勒币";
             }
             RefreshRepairSlots();
             RefreshProducts();
@@ -107,8 +103,7 @@ namespace SpotlightGameJam.UI
         private void HealPlayer()
         {
             if (service == null) return;
-            service.TryHeal(out var message);
-            if (transactionText) transactionText.text = message;
+            service.TryHeal(out _);
             Refresh();
         }
 
@@ -123,24 +118,28 @@ namespace SpotlightGameJam.UI
                 var models = ModelsForPart(i);
                 var source = models.FirstOrDefault(card => repairSources[i] != null && card.Data.cyberneticId == repairSources[i].Data.cyberneticId) ?? models.FirstOrDefault();
                 repairSources[i] = source;
+                // 优先使用型号对应的部件图标，未配置时沿用完整卡面作为兼容展示。
+                var artwork = source == null ? null : source.Data.icon ? source.Data.icon : source.Card.artwork;
                 var icon = slot.Find("Icon")?.GetComponent<Image>();
                 if (icon)
                 {
-                    icon.sprite = source == null ? null : source.Card.artwork;
+                    icon.sprite = artwork;
                     icon.enabled = icon.sprite != null; icon.preserveAspect = true;
                 }
                 // 未提供卡图时仍显示真实部位与型号；未携带的框不留下上一份绑定的图标。
-                SetSlotText(slot, "Symbol", source != null && !source.Card.artwork ? new[] { "脑机", "躯干", "手部", "腿部" }[i] : "");
-                SetSlotText(slot, "Name", source == null ? "" : source.Card.cardName);
-                SetSlotText(slot, "Durability", source == null ? "" : "耐久 " + source.Durability + " / " + source.Data.maxDurability);
+                SetSlotText(slot, "Symbol", source != null && !artwork ? new[] { "脑机", "躯干", "手部", "腿部" }[i] : "");
+                SetSlotText(slot, "Durability", source == null ? "" : "耐久 " + source.Durability + "/" + source.Data.maxDurability);
+                var currencyIcon = slot.Find("RepairCurrencyIcon")?.GetComponent<Image>();
+                if (currencyIcon) currencyIcon.enabled = source != null && source.Data.shopPricing;
                 var repair = slot.Find("RepairButton");
                 if (repair)
                 {
+                    repair.GetComponent<ShopRepairHoldPreview>()?.Bind(source?.Card);
                     repair.gameObject.SetActive(source != null);
                     var button = repair.GetComponent<Button>();
                     button.interactable = service != null && service.CanRepair(source, out _);
                     var label = repair.GetComponentInChildren<Text>(true);
-                    if (label) label.text = source != null && source.Data.shopPricing ? "修复 · " + source.Data.shopPricing.repairPrice + " 塞勒币" : "修复未定价";
+                    if (label) label.text = source != null && source.Data.shopPricing ? source.Data.shopPricing.repairPrice.ToString() : "—";
                 }
                 var cycle = slot.Find("CycleButton");
                 if (cycle)
@@ -171,9 +170,9 @@ namespace SpotlightGameJam.UI
         /// <summary>修复按钮只转发服务请求，失败不会扣费或修改牌。</summary>
         private void RepairSlot(int index)
         {
+            if (repairButtons[index] && repairButtons[index].GetComponent<ShopRepairHoldPreview>()?.ConsumeClick() == true) return;
             if (service == null || repairSources == null) return;
-            service.TryRepair(repairSources[index], out var message);
-            if (transactionText) transactionText.text = message;
+            service.TryRepair(repairSources[index], out _);
             Refresh();
         }
 
@@ -181,12 +180,11 @@ namespace SpotlightGameJam.UI
         private void PurchaseSlot(int index)
         {
             if (service == null || index >= productDefinitions.Length) return;
-            service.TryPurchase(productDefinitions[index], out var message);
-            if (transactionText) transactionText.text = message;
+            service.TryPurchase(productDefinitions[index], out _);
             Refresh();
         }
 
-        /// <summary>价格、已拥有状态与余额共用服务校验，未定价商品保持禁用。</summary>
+        /// <summary>价格、本次商店售罄状态与余额共用服务校验，未定价商品保持禁用。</summary>
         private void RefreshProducts()
         {
             for (int i = 0; i < productSlots.Length; i++)
@@ -202,15 +200,25 @@ namespace SpotlightGameJam.UI
                     // 卡面和费用必须跟随同一个商品配置，不能依赖构建时留下的旧预览。
                     if (valid && view && view.Data != data.cards[0]) view.Bind(new CardInstance(data.cards[0], new CyberneticInstance(data)));
                     if (view) view.SetInteractable(false);
+                    cardRoot.GetComponent<ShopRepairHoldPreview>()?.Bind(valid ? data.cards[0] : null);
+                    // 完整美术卡面已包含文字；只在商店商品预览中隐藏模板底色和重复文案。
+                    var face = cardRoot.Find("ArtFace")?.GetComponent<Image>();
+                    if (face)
+                    {
+                        var artwork = valid ? data.cards[0].artwork : null;
+                        face.sprite = artwork; face.enabled = artwork;
+                        foreach (var text in cardRoot.GetComponentsInChildren<Text>(true)) text.enabled = !artwork;
+                        var background = cardRoot.GetComponent<Image>();
+                        if (background) background.enabled = !artwork;
+                    }
                 }
-                SetSlotText(slot, "Part", valid ? new[] { "脑机", "躯干", "手部", "腿部" }[(int)data.slot] : "");
                 bool priced = valid && data.shopPricing && data.shopPricing.canPurchase;
                 SetSlotText(slot, "Price", priced ? data.shopPricing.purchasePrice + " 塞勒币" : "购买价格未定");
                 var owner = slot.Find("BuyButton"); if (!owner) continue;
                 var button = owner.GetComponent<Button>();
                 button.interactable = service != null && service.CanPurchase(data, out _);
                 var label = button.GetComponentInChildren<Text>(true);
-                if (label) label.text = data && run != null && run.Loadout.OwnsConfiguration(data) ? "已拥有" : "购买 ×1";
+                if (label) label.text = data && run != null && run.Shop.HasPurchased(data) ? "已售出" : "购买 ×1";
             }
         }
 
@@ -265,6 +273,7 @@ namespace SpotlightGameJam.UI
             run.Player.Changed += OnPlayerChanged;
             run.Loadout.Changed += OnLoadoutChanged;
             run.GoldChanged += OnGoldChanged;
+            run.Shop.Changed += RefreshProducts;
         }
 
         /// <summary>关闭或切换绑定时解除旧探索订阅，避免窗口继续持有旧牌组。</summary>
@@ -274,6 +283,7 @@ namespace SpotlightGameJam.UI
             run.Player.Changed -= OnPlayerChanged;
             run.Loadout.Changed -= OnLoadoutChanged;
             run.GoldChanged -= OnGoldChanged;
+            run.Shop.Changed -= RefreshProducts;
         }
 
         /// <summary>持久库存或共享耐久变化时同步维修对象与商品拥有状态。</summary>
@@ -290,10 +300,13 @@ namespace SpotlightGameJam.UI
             {
                 var card = productCards[i]; var slot = productSlots[i];
                 if (!card || !slot || card.rect.width <= 0 || card.rect.height <= 0) continue;
-                float scale = Mathf.Min(slot.rect.width * (270f / 345f) / card.rect.width,
-                    slot.rect.height * (258f / 380f) / card.rect.height);
+                // 商品卡面统一为完整美术的竖版比例，避免窄卡面在横宽模板内显得偏小。
+                card.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, card.rect.width * (255f / 180f));
+                float scale = Mathf.Min(slot.rect.width * .90f / card.rect.width,
+                    slot.rect.height * .70f / card.rect.height);
                 card.localScale = Vector3.one * scale;
-                card.anchoredPosition = new Vector2(0, -slot.rect.height * (12f / 380f));
+                card.localRotation = Quaternion.identity;
+                card.anchoredPosition = new Vector2(0, -slot.rect.height * .01f);
             }
         }
     }

@@ -39,6 +39,7 @@ namespace SpotlightGameJam
         public NewWorldSetBonusState SetBonuses { get; }
         public RunBuffState Buffs { get; }
         public int Gold { get; private set; }
+        public ShopVisitState Shop { get; } = new ShopVisitState();
         /// <summary>塞勒币余额变化通知，供地图商店及顶部工具栏即时刷新。</summary>
         public event Action<int> GoldChanged;
         // 普通冒险牌组中的唯一持久幻痛条目；战斗重建牌区时再次加入手牌，不写回共享资产。

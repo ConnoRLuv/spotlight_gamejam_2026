@@ -27,7 +27,7 @@ namespace SpotlightGameJam.Tests
                     {
                         var source = run.Loadout.Owned.FirstOrDefault(card => (int)card.Data.slot == i);
                         Assert.That(RepairText(panel, i, "Name"), Is.EqualTo(source == null ? "" : source.Card.cardName));
-                        Assert.That(RepairText(panel, i, "Durability"), Is.EqualTo(source == null ? "" : "耐久 " + source.Durability + " / " + source.Data.maxDurability));
+                        Assert.That(RepairText(panel, i, "Durability"), Is.EqualTo(source == null ? "" : "耐久 " + source.Durability + "/" + source.Data.maxDurability));
                     }
                 });
             }
@@ -50,11 +50,11 @@ namespace SpotlightGameJam.Tests
                     type.GetMethod("Bind").Invoke(panel, new object[] { run });
                     type.GetMethod("Show").Invoke(panel, new object[] { 0f });
                     Assert.That(RepairText(panel, 0, "Name"), Is.EqualTo(copy.Card.cardName));
-                    Assert.That(RepairText(panel, 0, "Durability"), Is.EqualTo("耐久 0 / " + data.maxDurability));
+                    Assert.That(RepairText(panel, 0, "Durability"), Is.EqualTo("耐久 0/" + data.maxDurability));
                     type.GetMethod("Hide").Invoke(panel, new object[] { 0f });
                     copy.Repair(2);
                     type.GetMethod("Show").Invoke(panel, new object[] { 0f });
-                    Assert.That(RepairText(panel, 0, "Durability"), Is.EqualTo("耐久 2 / " + data.maxDurability));
+                    Assert.That(RepairText(panel, 0, "Durability"), Is.EqualTo("耐久 2/" + data.maxDurability));
                     type.GetMethod("Bind").Invoke(panel, new object[] { null });
                     copy.Repair(1);
                     Assert.That(RepairText(panel, 0, "Name"), Is.Empty);
@@ -80,7 +80,7 @@ namespace SpotlightGameJam.Tests
                     Assert.That(RepairText(panel, 0, "Name"), Is.EqualTo(initial.cards[0].cardName));
                     panel.GetType().GetMethod("CycleRepairSlot", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic).Invoke(panel, new object[] { 0 });
                     Assert.That(RepairText(panel, 0, "Name"), Is.EqualTo(data.cards[0].cardName));
-                    Assert.That(RepairText(panel, 0, "Durability"), Is.EqualTo("耐久 " + data.maxDurability + " / " + data.maxDurability));
+                    Assert.That(RepairText(panel, 0, "Durability"), Is.EqualTo("耐久 " + data.maxDurability + "/" + data.maxDurability));
                 });
             }
         }
@@ -89,6 +89,12 @@ namespace SpotlightGameJam.Tests
         private static string RepairText(Component panel, int index, string child)
         {
             var slot = new SerializedObject(panel).FindProperty("repairSlots").GetArrayElementAtIndex(index).objectReferenceValue as RectTransform;
+            if (child == "Name")
+            {
+                var preview = slot.Find("RepairButton").GetComponent("ShopRepairHoldPreview");
+                var card = (CardData)preview.GetType().GetProperty("DisplayedCard").GetValue(preview);
+                return card ? card.cardName : "";
+            }
             var text = slot.Find(child).GetComponent("Text");
             return (string)text.GetType().GetProperty("text").GetValue(text);
         }

@@ -53,9 +53,51 @@ namespace SpotlightGameJam.Tests
             {
                 Assert.That(added[0].IsInitialCard, Is.False);
                 Assert.That(run.Loadout.GetUsableCards().Count(card => card.Source.Data == product), Is.EqualTo(1));
-                Assert.That(Call(shop, "TryPurchase", product), Is.False, "已拥有型号不能再次收费购买。");
+                Assert.That(Call(shop, "TryPurchase", product), Is.False, "同一商店该型号只能购买一次。");
                 Assert.That(run.Gold, Is.EqualTo(balance - 1000));
             }
+        }
+
+        /// <summary>已有型号可购买一张并共享原耐久；同店重建服务不补货，下个节点才恢复库存。</summary>
+        [Test]
+        public void OwnedModelsCanBePurchasedOncePerPersistentShopNode()
+        {
+            var run = new RunState(assets.Create<BattleRules>()); run.AddGold(10000);
+            var data = Part("owned", 3, 300); run.Loadout.AddInitial(data);
+            while (run.Loadout.Owned[0].TryConsumeDurability()) { }
+            run.Shop.Enter("shop-a");
+            Assert.That(Call(Service(run), "TryPurchase", data), Is.True);
+            Assert.That(run.Loadout.Owned.Count, Is.EqualTo(4));
+            Assert.That(run.Loadout.Owned.Select(card => card.Durability), Is.All.Zero);
+            Assert.That(run.Loadout.Owned.Last().IsInitialCard, Is.False);
+            Assert.That(run.Gold, Is.EqualTo(9000));
+            Assert.That(Call(Service(run), "TryPurchase", data), Is.False);
+            run.Shop.Enter("shop-a");
+            Assert.That(Call(Service(run), "TryPurchase", data), Is.False);
+            run.Shop.Enter("shop-b");
+            Assert.That(Call(Service(run), "TryPurchase", data), Is.True);
+            Assert.That(run.Loadout.Owned.Count, Is.EqualTo(5));
+            Assert.That(run.Gold, Is.EqualTo(8000));
+            run.Shop.Enter("shop-a");
+            Assert.That(Call(Service(run), "TryPurchase", data), Is.False);
+            run.Loadout.Owned.Last().Repair(1);
+            Assert.That(run.Loadout.Owned.Select(card => card.Durability), Is.All.EqualTo(1));
+        }
+
+        /// <summary>余额不足不消耗库存；补足后可购买，回调中新建服务也不能重复结算。</summary>
+        [Test]
+        public void InsufficientFundsAndReentryDoNotConsumeExtraStock()
+        {
+            var run = new RunState(assets.Create<BattleRules>()); var data = Part("limited", 1, 300);
+            Assert.That(Call(Service(run), "TryPurchase", data), Is.False);
+            Assert.That(run.Shop.HasPurchased(data), Is.False);
+            run.AddGold(3000);
+            bool nested = true;
+            run.GoldChanged += amount => nested = Call(Service(run), "TryPurchase", data);
+            Assert.That(Call(Service(run), "TryPurchase", data), Is.True);
+            Assert.That(nested, Is.False);
+            Assert.That(run.Gold, Is.EqualTo(2000));
+            Assert.That(run.Loadout.Owned.Count, Is.EqualTo(1));
         }
 
         /// <summary>各系列单次修复仅增加一点共享耐久，零耐久也允许修复，余额准确扣除。</summary>

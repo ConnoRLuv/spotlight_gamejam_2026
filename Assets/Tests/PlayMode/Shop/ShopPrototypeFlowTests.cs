@@ -40,6 +40,9 @@ namespace SpotlightGameJam.Tests
             dialogue = entry.GetComponentInChildren<DialoguePanel>(true);
             shop = entry.GetComponentInChildren<ShopPanel>(true);
             Assert.That(hud.Battle, Is.Not.Null);
+            Assert.That(hud.Battle.Context.Run.Gold, Is.EqualTo(9999), "测试入口应在启动时提供 9999 塞勒币。");
+            // 交易边界用例仍从明确的零余额开始，避免测试补币掩盖余额不足等校验。
+            hud.Battle.Context.Run.TrySpendGold(hud.Battle.Context.Run.Gold);
         }
 
         /// <summary>还原临时设置和测试会话，不保存运行时场景或测试资源变化。</summary>
@@ -124,21 +127,21 @@ namespace SpotlightGameJam.Tests
             entry.Open(); dialogue.Advance(); dialogue.Advance();
             shop.Bind(run);
             var slot = shop.transform.Find("Layout_16x9/RepairSlot_脑机");
-            var name = slot.Find("Name").GetComponent<Text>();
+            var preview = slot.Find("RepairButton").GetComponent<ShopRepairHoldPreview>();
             var durability = slot.Find("Durability").GetComponent<Text>();
             var source = run.Loadout.Owned[1];
             while (source.TryConsumeDurability()) { }
-            Assert.That(name.text, Is.EqualTo(source.Card.cardName));
-            Assert.That(durability.text, Is.EqualTo("耐久 0 / " + data.maxDurability));
+            Assert.That(preview.DisplayedCard, Is.SameAs(source.Card));
+            Assert.That(durability.text, Is.EqualTo("耐久 0/" + data.maxDurability));
             shop.Hide(0); source.Repair(2);
-            Assert.That(durability.text, Is.EqualTo("耐久 0 / " + data.maxDurability), "隐藏后应解除耐久订阅。");
+            Assert.That(durability.text, Is.EqualTo("耐久 0/" + data.maxDurability), "隐藏后应解除耐久订阅。");
             shop.Show(0);
-            Assert.That(durability.text, Is.EqualTo("耐久 2 / " + data.maxDurability));
+            Assert.That(durability.text, Is.EqualTo("耐久 2/" + data.maxDurability));
             source.TryConsumeDurability();
-            Assert.That(durability.text, Is.EqualTo("耐久 1 / " + data.maxDurability));
+            Assert.That(durability.text, Is.EqualTo("耐久 1/" + data.maxDurability));
             shop.Bind(new RunState(hud.Battle.Context.Rules));
             source.Repair(1);
-            Assert.That(name.text, Is.Empty);
+            Assert.That(preview.DisplayedCard, Is.Null);
             Assert.That(durability.text, Is.Empty);
             Assert.That(slot.Find("RepairButton").gameObject.activeSelf, Is.False);
             entry.Close(); yield return new WaitForSecondsRealtime(0.2f);
@@ -185,7 +188,7 @@ namespace SpotlightGameJam.Tests
             Assert.That(run.Gold, Is.EqualTo(150));
             Assert.That(run.Loadout.Owned.Where(card => card.Data == original).Select(card => card.Durability), Is.All.EqualTo(original.maxDurability - 1));
             Click(slot.Find("CycleButton").GetComponent<Button>());
-            Assert.That(slot.Find("Name").GetComponent<Text>().text, Is.EqualTo(product.cards[0].cardName));
+            Assert.That(repair.GetComponent<ShopRepairHoldPreview>().DisplayedCard, Is.SameAs(product.cards[0]));
             Assert.That(repair.IsInteractable(), Is.False, "满耐久不能收费修复。");
             var purchased = run.Loadout.Owned.Single(card => card.Data == product); purchased.TryConsumeDurability();
             Assert.That(repair.IsInteractable(), Is.False, "余额不足不能修复。");
@@ -199,6 +202,36 @@ namespace SpotlightGameJam.Tests
             entry.Close(); yield return new WaitForSecondsRealtime(0.2f);
         }
 
+        /// <summary>已有商品仍可买一次，同店重开保持售罄，进入下一商店才恢复按钮。</summary>
+        [UnityTest]
+        public IEnumerator OwnedProductStockPersistsAcrossReopenAndResetsAtNextShop()
+        {
+            var run = hud.Battle.Context.Run; run.AddGold(4000); run.Shop.Enter("shop-a");
+            var data = run.Loadout.Owned.First(source => source.Data.slot == CyberneticSlot.Brain).Data;
+            int count = run.Loadout.Owned.Count(source => source.Data == data);
+            var zones = hud.Battle.Context.Cybernetic.DrawPile.Cards.Concat(hud.Battle.Context.Cybernetic.Hand.Cards)
+                .Concat(hud.Battle.Context.Cybernetic.DiscardPile.Cards).Select(card => card.Id).ToArray();
+            entry.Open(); dialogue.Advance(); dialogue.Advance();
+            var buy = shop.transform.Find("Layout_16x9/ProductSlot_0/BuyButton").GetComponent<Button>();
+            Assert.That(buy.GetComponentInChildren<Text>().text, Is.EqualTo("购买 ×1"));
+            Click(buy);
+            Assert.That(run.Gold, Is.EqualTo(3000));
+            Assert.That(run.Loadout.Owned.Count(source => source.Data == data), Is.EqualTo(count + 1));
+            Assert.That(buy.IsInteractable(), Is.False);
+            Assert.That(buy.GetComponentInChildren<Text>().text, Is.EqualTo("已售出"));
+            entry.Close(); yield return new WaitForSecondsRealtime(.2f);
+            entry.Open(); dialogue.Advance(); dialogue.Advance();
+            Assert.That(buy.IsInteractable(), Is.False, "关闭、重新 Bind 同一探索不得刷新限购。");
+            run.Shop.Enter("shop-a"); Assert.That(buy.IsInteractable(), Is.False);
+            run.Shop.Enter("shop-b"); Assert.That(buy.IsInteractable(), Is.True);
+            Click(buy);
+            Assert.That(run.Gold, Is.EqualTo(2000));
+            Assert.That(run.Loadout.Owned.Count(source => source.Data == data), Is.EqualTo(count + 2));
+            Assert.That(hud.Battle.Context.Cybernetic.DrawPile.Cards.Concat(hud.Battle.Context.Cybernetic.Hand.Cards)
+                .Concat(hud.Battle.Context.Cybernetic.DiscardPile.Cards).Select(card => card.Id), Is.EqualTo(zones));
+            entry.Close(); yield return new WaitForSecondsRealtime(.2f);
+        }
+
         /// <summary>真实回血按钮每次只收费一次，重复开关不叠加监听，生命和余额即时同步。</summary>
         [UnityTest]
         public IEnumerator HealButtonChargesOnceAndUpdatesVisibleHealth()
@@ -209,7 +242,9 @@ namespace SpotlightGameJam.Tests
             Click(heal);
             Assert.That(run.Player.Health, Is.EqualTo(90)); Assert.That(run.Gold, Is.EqualTo(100));
             Assert.That(hud.GetComponent<BattleSceneReferences>().healthText.text, Is.EqualTo("生命 90"));
-            Assert.That(shop.transform.Find("Layout_16x9/HealthText").GetComponent<Text>().text, Is.EqualTo("生命 90 / 100"));
+            Assert.That(shop.transform.Find("Layout_16x9/HealthText"), Is.Null);
+            Assert.That(shop.transform.Find("Layout_16x9/HealingAmount").GetComponent<Text>().text, Is.EqualTo("+10"));
+            Assert.That(shop.transform.Find("Layout_16x9/HealingPrice").GetComponent<Text>().text, Is.EqualTo("100"));
             entry.Close(); yield return new WaitForSecondsRealtime(0.2f);
             entry.Open(); dialogue.Advance(); dialogue.Advance(); Click(heal);
             Assert.That(run.Player.Health, Is.EqualTo(100)); Assert.That(run.Gold, Is.Zero);
@@ -223,6 +258,100 @@ namespace SpotlightGameJam.Tests
             Assert.That(hud.GetComponent<BattleSceneReferences>().healthText.text, Is.EqualTo("生命 100"));
             Assert.That(hud.GetComponent<BattleSceneReferences>().goldText.text, Is.EqualTo("塞勒币 0"));
             entry.Close(); yield return new WaitForSecondsRealtime(0.2f);
+        }
+
+        /// <summary>长按只预览，不扣费；松开和退出收起大图，随后短按仍可修复。</summary>
+        [UnityTest]
+        public IEnumerator RepairHoldPreviewsWithoutChargingAndShortClickStillRepairs()
+        {
+            var run = hud.Battle.Context.Run; run.AddGold(1000);
+            run.Loadout.Owned[0].TryConsumeDurability();
+            entry.Open(); dialogue.Advance(); dialogue.Advance();
+            yield return new WaitForSecondsRealtime(.2f);
+            var button = shop.transform.Find("Layout_16x9/RepairSlot_脑机/RepairButton").GetComponent<Button>();
+            var hold = button.GetComponent<ShopRepairHoldPreview>();
+            Assert.That(hold, Is.Not.Null);
+            var before = Snapshot();
+            var pointer = new PointerEventData(EventSystem.current) { button = PointerEventData.InputButton.Left, pointerId = -1, eligibleForClick = true };
+            // 普通短按阶段不创建可见圆环，也不弹出预览。
+            ExecuteEvents.Execute(button.gameObject, pointer, ExecuteEvents.pointerDownHandler);
+            Assert.That(button.GetComponentInChildren<HoldProgressRing>(), Is.Null);
+            yield return new WaitForSecondsRealtime(.05f);
+            Assert.That(button.GetComponentInChildren<HoldProgressRing>(), Is.Null);
+            ExecuteEvents.Execute(button.gameObject, pointer, ExecuteEvents.pointerUpHandler);
+            ExecuteEvents.Execute(button.gameObject, pointer, ExecuteEvents.pointerDownHandler);
+            yield return new WaitForSecondsRealtime(.2f);
+            var ring = button.GetComponentInChildren<HoldProgressRing>();
+            Assert.That(ring, Is.Not.Null);
+            Assert.That(ring.Progress, Is.GreaterThan(0).And.LessThan(1));
+            Assert.That(ring.raycastTarget, Is.False);
+            Canvas.ForceUpdateCanvases();
+            Assert.That(ring.canvasRenderer, Is.Not.Null);
+            Assert.That(ring.canvasRenderer.GetMesh().vertexCount, Is.GreaterThan(0), "圆环必须生成可渲染网格。");
+            Assert.That(hold.IsPreviewVisible, Is.False);
+            Capture(shop, new Vector2Int(1920, 1080));
+            File.Copy("Logs/ShopPrototype/ShopPanel-1920x1080.png", "Logs/ShopPrototype/ShopHoldProgress.png", true);
+            ExecuteEvents.Execute(button.gameObject, pointer, ExecuteEvents.pointerExitHandler);
+            Assert.That(ring.gameObject.activeSelf, Is.False);
+            Assert.That(ring.Progress, Is.Zero);
+            ExecuteEvents.Execute(button.gameObject, pointer, ExecuteEvents.pointerDownHandler);
+            yield return new WaitForSecondsRealtime(.5f);
+            Assert.That(ring.gameObject.activeSelf, Is.False);
+            Assert.That(hold.IsPreviewVisible, Is.True);
+            Assert.That(Snapshot(), Is.EqualTo(before));
+            Capture(shop, new Vector2Int(1920, 1080));
+            File.Copy("Logs/ShopPrototype/ShopPanel-1920x1080.png", "Logs/ShopPrototype/ShopRepairLongPress.png", true);
+            ExecuteEvents.Execute(button.gameObject, pointer, ExecuteEvents.pointerUpHandler);
+            Assert.That(pointer.eligibleForClick, Is.False);
+            Assert.That(hold.IsPreviewVisible, Is.False);
+            Click(button); // 防御性校验：即使外部直接派发 click，仍不能因长按扣费。
+            Assert.That(Snapshot(), Is.EqualTo(before));
+            ExecuteEvents.Execute(button.gameObject, pointer, ExecuteEvents.pointerDownHandler);
+            ExecuteEvents.Execute(button.gameObject, pointer, ExecuteEvents.pointerUpHandler);
+            var gold = run.Gold;
+            Click(button);
+            Assert.That(run.Gold, Is.EqualTo(gold - run.Loadout.Owned[0].Data.shopPricing.repairPrice));
+            entry.Close(); yield return new WaitForSecondsRealtime(.2f);
+            Assert.That(hold.IsPreviewVisible, Is.False);
+        }
+
+        /// <summary>商品完整卡面与模板卡面均支持圆环长按，购买按钮独立且浏览不改变资源。</summary>
+        [UnityTest]
+        public IEnumerator ProductCardsShareHoldProgressWithoutPurchasing()
+        {
+            entry.Open(); dialogue.Advance(); dialogue.Advance();
+            yield return new WaitForSecondsRealtime(.2f);
+            var before = Snapshot();
+            foreach (int index in new[] { 0, 4 })
+            {
+                var card = shop.transform.Find("Layout_16x9/ProductSlot_" + index + "/CardPreview");
+                var hold = card.GetComponent<ShopRepairHoldPreview>();
+                Assert.That(hold, Is.Not.Null);
+                var pointer = new PointerEventData(EventSystem.current) { button = PointerEventData.InputButton.Left, pointerId = -1 };
+                var canvas = card.GetComponentInParent<Canvas>();
+                pointer.position = RectTransformUtility.WorldToScreenPoint(canvas.worldCamera, ((RectTransform)card).TransformPoint(((RectTransform)card).rect.center));
+                var hits = new System.Collections.Generic.List<RaycastResult>();
+                EventSystem.current.RaycastAll(pointer, hits);
+                Assert.That(hits.Count, Is.GreaterThan(0));
+                Assert.That(ExecuteEvents.GetEventHandler<IPointerDownHandler>(hits[0].gameObject), Is.EqualTo(card.gameObject));
+                ExecuteEvents.Execute(card.gameObject, pointer, ExecuteEvents.pointerDownHandler);
+                yield return new WaitForSecondsRealtime(.2f);
+                var ring = card.GetComponentInChildren<HoldProgressRing>();
+                Assert.That(ring.Progress, Is.GreaterThan(0).And.LessThan(1));
+                yield return new WaitForSecondsRealtime(.3f);
+                Assert.That(hold.IsPreviewVisible, Is.True);
+                Assert.That(Snapshot(), Is.EqualTo(before));
+                if (index == 0)
+                {
+                    Capture(shop, new Vector2Int(1920, 1080));
+                    File.Copy("Logs/ShopPrototype/ShopPanel-1920x1080.png", "Logs/ShopPrototype/ShopProductLongPress.png", true);
+                }
+                ExecuteEvents.Execute(card.gameObject, pointer, ExecuteEvents.pointerUpHandler);
+                Assert.That(hold.IsPreviewVisible, Is.False);
+                Assert.That(ring.gameObject.activeSelf, Is.False);
+            }
+            entry.Close(); yield return new WaitForSecondsRealtime(.2f);
+            Assert.That(Snapshot(), Is.EqualTo(before));
         }
 
         /// <summary>检查三个目标分辨率下的文字、卡面与顶部工具栏均正常显示。</summary>
@@ -295,14 +424,14 @@ namespace SpotlightGameJam.Tests
                 {
                     var corners = new Vector3[4]; ((RectTransform)card.transform).GetWorldCorners(corners);
                     float bottom = corners.Min(corner => frame.InverseTransformPoint(corner).y);
-                    var part = card.transform.parent.Find("Part") as RectTransform;
+                    var part = card.transform.parent.Find("Price") as RectTransform;
                     part.GetWorldCorners(corners);
                     float top = corners.Max(corner => frame.InverseTransformPoint(corner).y);
-                    Assert.That(bottom, Is.GreaterThanOrEqualTo(top), "商品卡面与部位标签重叠 " + size);
+                    Assert.That(bottom, Is.GreaterThanOrEqualTo(top), "商品卡面与价格标签重叠 " + size);
                 }
                 camera.Render(); RenderTexture.active = target;
                 foreach (var text in frame.GetComponentsInChildren<Text>())
-                    if (!string.IsNullOrWhiteSpace(text.text))
+                    if (text.isActiveAndEnabled && !string.IsNullOrWhiteSpace(text.text))
                         Assert.That(text.cachedTextGenerator.characterCountVisible, Is.GreaterThan(0), text.name + " 文本被截断 " + size);
                 image.ReadPixels(new Rect(0, 0, size.x, size.y), 0, 0); image.Apply();
                 Directory.CreateDirectory("Logs/ShopPrototype");

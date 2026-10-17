@@ -15,6 +15,7 @@ MonoBehaviour:
   cyberneticId: PrometheusBrainCard
   factionId: tian-qiong-legion
   slot: 0
+  icon: {fileID: 21300000, guid: fa210dd0d740545a88d13a8762b8c9b0, type: 3}
   maxDurability: 4
   shopPricing: {fileID: 11400000, guid: 2f03d84dd6853514caa006e8de0bbfad, type: 2}
   cards:

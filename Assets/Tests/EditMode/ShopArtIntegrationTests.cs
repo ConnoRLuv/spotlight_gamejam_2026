@@ -21,10 +21,23 @@ namespace SpotlightGameJam.Tests
                 var panel = root.GetComponent("ShopPanel");
                 panel.GetType().GetMethod("Bind").Invoke(panel, new object[] { run });
                 var slot = root.transform.Find("Layout_16x9/RepairSlot_脑机");
-                Assert.That(slot.Find("Symbol").GetComponent<Text>().text, Is.EqualTo("脑机"));
+                Assert.That(slot.Find("Symbol").GetComponent<Text>().text, Is.Empty);
+                Assert.That(slot.Find("Icon").GetComponent<Image>().sprite,
+                    Is.SameAs(AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/义体/脑机-普罗米修斯.png")));
+                var durability = slot.Find("Durability").GetComponent<Text>();
+                var fee = slot.Find("RepairButton/Label").GetComponent<Text>();
+                var font = AssetDatabase.LoadAssetAtPath<Font>("Assets/Fonts/荆南俊俊体.ttf");
+                Assert.That(durability.font, Is.SameAs(font));
+                Assert.That(fee.font, Is.SameAs(font));
+                Assert.That(durability.fontSize, Is.EqualTo(22));
+                Assert.That(fee.fontSize, Is.EqualTo(22));
+                Assert.That(fee.text, Is.EqualTo("300"));
+                Assert.That(slot.Find("RepairCurrencyIcon").GetComponent<Image>().sprite,
+                    Is.SameAs(AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/UI/Goldicon.png")));
                 panel.GetType().GetMethod("Bind").Invoke(panel, new object[] { null });
                 Assert.That(slot.Find("Symbol").GetComponent<Text>().text, Is.Empty);
                 Assert.That(slot.Find("Icon").GetComponent<Image>().enabled, Is.False);
+                Assert.That(slot.Find("RepairCurrencyIcon").GetComponent<Image>().enabled, Is.False);
             }
             finally { Object.DestroyImmediate(root); Object.DestroyImmediate(rules); }
         }
@@ -35,6 +48,17 @@ namespace SpotlightGameJam.Tests
         {
             var root = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/UI/ShopPanel.prefab");
             var frame = root.transform.Find("Layout_16x9");
+            Assert.That(frame.Find("HealthText"), Is.Null, "旧生命文字应删除而非隐藏。");
+            var font = AssetDatabase.LoadAssetAtPath<Font>("Assets/Fonts/荆南俊俊体.ttf");
+            foreach (var text in root.GetComponentsInChildren<Text>(true))
+            {
+                Assert.That(text.font, Is.SameAs(font), text.name);
+                Assert.That(text.fontSize, Is.EqualTo(text.name == "HealingAmount" || text.name == "HealingPrice" ? 28 : 22), text.name);
+            }
+            Assert.That(frame.Find("HealingHealthIcon").GetComponent<Image>().sprite,
+                Is.SameAs(AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/UI/Healthicon.png")));
+            Assert.That(frame.Find("HealingCurrencyIcon").GetComponent<Image>().sprite,
+                Is.SameAs(AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/UI/Goldicon.png")));
             var background = frame.Find("ArtBackground");
             Assert.That(background, Is.Not.Null, "商店尚未接入新美术。");
             var art = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/UI/Shop_Popup.prefab");

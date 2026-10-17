@@ -142,12 +142,11 @@ namespace SpotlightGameJam.Editor
                 var panel = root.GetComponent<ShopPanel>(); var fields = new SerializedObject(panel);
                 var frame = root.transform.Find("Layout_16x9");
                 var heal = frame.Find("HealButton").GetComponent<Button>();
-                heal.GetComponentInChildren<Text>(true).text = "回血 +" + ShopService.HealingAmount + "\n" + ShopService.HealingPrice + " 塞勒币";
+                var healLabel = heal.GetComponentInChildren<Text>(true);
+                if (healLabel) healLabel.text = "回血 +" + ShopService.HealingAmount + "\n" + ShopService.HealingPrice + " 塞勒币";
                 fields.FindProperty("healButton").objectReferenceValue = heal;
-                frame.Find("RepairHint").GetComponent<Text>().text = "每次修复恢复 1 点耐久 · 同部位可切换型号";
-                var hint = frame.Find("PrototypeHint").GetComponent<Text>();
-                hint.text = "购买获得 1 张牌，下场战斗入堆；修复每次恢复 1 点耐久。";
-                fields.FindProperty("transactionText").objectReferenceValue = hint;
+                var repairHint = frame.Find("RepairHint");
+                if (repairHint) repairHint.GetComponent<Text>().text = "每次修复恢复 1 点耐久 · 同部位可切换型号";
                 var repairs = fields.FindProperty("repairSlots");
                 for (int i = 0; i < repairs.arraySize; i++)
                 {
@@ -155,8 +154,11 @@ namespace SpotlightGameJam.Editor
                     if (!slot.Find("CycleButton"))
                     {
                         var part = slot.Find("Part") as RectTransform;
-                        part.anchorMin = new Vector2(10f / 268, 1 - 48f / 274); part.anchorMax = new Vector2(150f / 268, 1 - 10f / 274);
-                        part.offsetMin = part.offsetMax = Vector2.zero;
+                        if (part)
+                        {
+                            part.anchorMin = new Vector2(10f / 268, 1 - 48f / 274); part.anchorMax = new Vector2(150f / 268, 1 - 10f / 274);
+                            part.offsetMin = part.offsetMax = Vector2.zero;
+                        }
                         var cycle = Button(slot, "CycleButton", new Rect(156, 12, 102, 32), "切换", 268, 274);
                         cycle.gameObject.SetActive(false);
                     }
@@ -182,7 +184,8 @@ namespace SpotlightGameJam.Editor
                         var rect = (RectTransform)card.transform; rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 1); rect.pivot = new Vector2(0.5f, 1); rect.anchoredPosition = new Vector2(0, -12);
                         rect.localScale = Vector3.one * Mathf.Min(270 / rect.rect.width, 258 / rect.rect.height);
                     }
-                    slot.Find("Part").GetComponent<Text>().text = new[] { "脑机", "躯干", "手部", "腿部" }[(int)data.slot];
+                    var partLabel = slot.Find("Part");
+                    if (partLabel) partLabel.GetComponent<Text>().text = new[] { "脑机", "躯干", "手部", "腿部" }[(int)data.slot];
                     slot.Find("Price").GetComponent<Text>().text = data.shopPricing && data.shopPricing.canPurchase ? data.shopPricing.purchasePrice + " 塞勒币" : "购买价格未定";
                     slot.Find("BuyButton").GetComponentInChildren<Text>(true).text = "购买 ×1";
                 }
@@ -237,7 +240,6 @@ namespace SpotlightGameJam.Editor
             Label(slogan, "Text", new Rect(20, 8, 580, 70), "为下一段旅途，留一份可能。", 28, TextAnchor.MiddleCenter, 620, 86);
             var heal = Button(frame, "HealButton", new Rect(56, 164, 280, 84), "回血 +" + ShopService.HealingAmount + "\n" + ShopService.HealingPrice + " 塞勒币"); heal.interactable = false;
             Set(panel, "healButton", heal);
-            Set(panel, "healthText", Label(frame, "HealthText", new Rect(352, 164, 324, 84), "生命 — / —", 27));
             Box(frame, "RepairBackground", new Rect(56, 274, 620, 736), Surface);
             Label(frame, "RepairTitle", new Rect(76, 288, 580, 54), "带入义体", 34);
             Label(frame, "RepairHint", new Rect(76, 344, 580, 38), "当前带入义体 · 修复功能待接入", 22);
@@ -256,7 +258,6 @@ namespace SpotlightGameJam.Editor
             SetArray(panel, "repairSlots", repairs);
             Box(frame, "ProductsBackground", new Rect(714, 54, 1150, 956), Surface);
             Label(frame, "ShopTitle", new Rect(750, 78, 650, 70), "义体商店", 48);
-            Set(panel, "currencyText", Label(frame, "CurrencyText", new Rect(1420, 90, 250, 48), "塞勒币 —", 27));
             Set(panel, "exitButton", Button(frame, "ExitButton", new Rect(1690, 72, 150, 68), "退出"));
             var products = new RectTransform[6];
             for (int i = 0; i < products.Length; i++)
@@ -274,7 +275,6 @@ namespace SpotlightGameJam.Editor
                 Button(slot, "BuyButton", new Rect(24, 344, 297, 32), "购买 · 功能待接入", 345, 380).interactable = false;
             }
             SetArray(panel, "productSlots", products);
-            Label(frame, "PrototypeHint", new Rect(750, 994, 1090, 38), "商店原型 · 浏览不消耗资源", 22);
             return root;
         }
 

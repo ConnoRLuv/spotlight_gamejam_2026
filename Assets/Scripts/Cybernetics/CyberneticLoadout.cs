@@ -37,7 +37,7 @@ namespace SpotlightGameJam
         }
         /// <summary>旧调试查询返回该部位的第一张持牌；战斗规则和 buff 不依赖此查询。</summary>
         public CyberneticInstance Get(CyberneticSlot slot) => cards.FirstOrDefault(value => value.Data.slot == slot);
-        /// <summary>改造或购买增加一种未持有义体的一张满耐久持久牌，不替换同部位其他型号。</summary>
+        /// <summary>改造增加一种未持有义体的一张满耐久持久牌，不替换同部位其他型号。</summary>
         public CardInstance AcquireCard(CyberneticData data, CardData card)
         {
             if (!data || data.Validate().Count > 0 || !data.cards.Contains(card) || OwnsConfiguration(data))
@@ -46,6 +46,17 @@ namespace SpotlightGameJam
             Register(source, false); Changed?.Invoke();
             return new CardInstance(card, source);
         }
+        /// <summary>商店每次购买只增加一张；已拥有型号沿用当前共享耐久，不重置报废状态。</summary>
+        public CardInstance PurchaseCard(CyberneticData data, CardData card)
+        {
+            if (!data || data.Validate().Count > 0 || !data.cards.Contains(card))
+                throw new ArgumentException("购买义体配置无效。");
+            var existing = cards.FirstOrDefault(value => value.Data.cyberneticId == data.cyberneticId);
+            var source = existing != null ? new CyberneticInstance(existing, card) : new CyberneticInstance(data, card);
+            Register(source, false); Changed?.Invoke();
+            return new CardInstance(card, source);
+        }
+
         /// <summary>登记持久牌并转发耐久通知，不改变任何共享配置。</summary>
         private void Register(CyberneticInstance instance, bool initial)
         { instance.IsInitialCard = initial; cards.Add(instance); instance.Changed += OnCardChanged; }

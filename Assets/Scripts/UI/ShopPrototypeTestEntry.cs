@@ -16,12 +16,23 @@ namespace SpotlightGameJam.UI
         [SerializeField] private DialogueSequenceData merchantDialogue;
         [SerializeField] private CanvasGroup battleInputGroup;
         [SerializeField] private RectTransform toolbar;
+        [Tooltip("仅商店测试入口启动时补足的余额；设为 0 关闭，不在每次打开商店时重复赠送。")]
+        [SerializeField, Min(0)] private int initialTestCoins = 9999;
         private readonly Vector3[] toolbarCorners = new Vector3[4];
         private BattleContext context;
         private Coroutine closing;
         private bool previousInteractable;
         private bool inputLocked;
         public bool IsOpen { get; private set; }
+
+        /// <summary>等待战斗就绪后仅初始化一次测试余额，不更改正式探索的初始货币规则。</summary>
+        private IEnumerator Start()
+        {
+            while (hud && hud.Battle == null) yield return null;
+            if (!hud || hud.Battle == null || initialTestCoins <= 0) yield break;
+            var run = hud.Battle.Context.Run;
+            if (run.Gold < initialTestCoins) run.AddGold(initialTestCoins - run.Gold);
+        }
 
         private void OnEnable()
         {

@@ -39,28 +39,31 @@ namespace SpotlightGameJam
             finally { transacting = false; }
         }
 
-        /// <summary>检查购买资格和余额；同型号持有包括零耐久，避免用购买重建满耐久。</summary>
+        /// <summary>检查定价、本次商店限购与余额；原有同型号持牌不影响购买资格。</summary>
         public bool CanPurchase(CyberneticData data, out string reason)
         {
             reason = null;
             if (!data || data.Validate().Count > 0) reason = "商品配置无效。";
             else if (!data.shopPricing || !data.shopPricing.canPurchase || data.shopPricing.purchasePrice < 0) reason = "该型号暂未开放购买。";
-            else if (run.Loadout.OwnsConfiguration(data)) reason = "已拥有该型号义体。";
+            else if (run.Shop.HasPurchased(data)) reason = "本次商店该商品已售出。";
             else if (run.Gold < data.shopPricing.purchasePrice) reason = "塞勒币不足。";
             return reason == null;
         }
 
-        /// <summary>成功支付后仅获得一张满耐久持久牌，保留同部位原型号，下场战斗自然入堆。</summary>
+        /// <summary>支付后获得一张持久牌并耗尽本店该型号库存；原型号共享耐久，下场战斗自然入堆。</summary>
         public bool TryPurchase(CyberneticData data, out string message)
         {
             if (transacting) { message = "交易正在处理中。"; return false; }
             if (!CanPurchase(data, out message)) return false;
+            var shopId = run.Shop.CurrentId;
+            if (!run.Shop.Reserve(shopId, data)) { message = "本次商店该商品已售出。"; return false; }
             transacting = true;
             try
             {
                 // 扣费事件可能触发 UI 刷新；交易锁阻止回调重入本服务。
-                if (!run.TrySpendGold(data.shopPricing.purchasePrice)) { message = "塞勒币不足。"; return false; }
-                run.Loadout.AcquireCard(data, data.cards[0]);
+                if (!run.TrySpendGold(data.shopPricing.purchasePrice))
+                { run.Shop.Release(shopId, data); message = "塞勒币不足。"; return false; }
+                run.Loadout.PurchaseCard(data, data.cards[0]);
                 message = "已购买 " + data.cards[0].cardName + " ×1，下场战斗加入义体牌堆。";
                 return true;
             }

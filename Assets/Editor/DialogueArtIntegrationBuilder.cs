@@ -98,6 +98,7 @@ namespace SpotlightGameJam.Editor
         /// <summary>使用浅色中文文本匹配深色美术底板，限制字号以兼容窄屏。</summary>
         private static void Style(Text text, int size, TextAnchor alignment)
         {
+            text.font = AssetDatabase.LoadAssetAtPath<Font>("Assets/Fonts/荆南俊俊体.ttf");
             text.color = Ink; text.fontSize = size; text.alignment = alignment;
             text.resizeTextForBestFit = true; text.resizeTextMinSize = 14; text.resizeTextMaxSize = size;
             text.horizontalOverflow = HorizontalWrapMode.Wrap; text.verticalOverflow = VerticalWrapMode.Truncate;
