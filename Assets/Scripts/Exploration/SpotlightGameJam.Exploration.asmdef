@@ -1,0 +1,6 @@
+{
+    "name": "SpotlightGameJam.Exploration",
+    "rootNamespace": "SpotlightGameJam",
+    "references": ["SpotlightGameJam.Runtime", "RoguelikeMap.Core", "RoguelikeMap.Unity"],
+    "autoReferenced": true
+}

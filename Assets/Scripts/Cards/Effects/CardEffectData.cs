@@ -20,6 +20,16 @@ namespace SpotlightGameJam
         public virtual bool RequiresTarget => false;
         /// <summary>需要选牌时，普通 TryPlay 在支付前返回 ChoiceRequired。</summary>
         public virtual bool RequiresChoice => false;
+        /// <summary>需要重排抽牌堆时返回 true；重排结果经 CardPlayRequest.Reorder 提交。</summary>
+        public virtual bool RequiresReorder => false;
+        public virtual string ReorderTitle => "调整抽牌堆顺序";
+        public virtual string ReorderPrompt => "按抽取顺序排列卡牌；取消不消耗资源。";
+        /// <summary>返回参与重排的全部卡牌快照（下一张在前）；默认效果无需重排。</summary>
+        public virtual IReadOnlyList<CardInstance> GetReorderCards(BattleContext context, CardInstance card) =>
+            System.Array.Empty<CardInstance>();
+        /// <summary>只读校验提交的重排顺序是否恰好覆盖目标牌区；不移动卡牌。</summary>
+        public virtual bool ValidateReorder(BattleContext context, CardInstance card, IReadOnlyList<CardInstance> order) =>
+            order != null && order.Count > 0;
         public virtual string ChoiceTitle => "选择一张卡牌";
         public virtual string ChoicePrompt => "请选择一张卡牌；取消不消耗资源。";
         public virtual bool ReserveChoiceBeforePayment => false;

@@ -25,7 +25,9 @@ namespace SpotlightGameJam
         public BattleTurnEffects TurnEffects { get; } = new BattleTurnEffects();
         /// <summary>获得实际 AP 费用，本回合免费效果只作用于基本牌，不修改共享配置。</summary>
         public int GetEffectiveApCost(CardInstance card) =>
-            card != null && card.Data.category == CardCategory.Basic && TurnEffects.FreeBasicCards ? 0 : card?.EffectiveApCost ?? 0;
+            card != null && card.Data.category == CardCategory.Basic &&
+            (TurnEffects.FreeBasicCards || TurnEffects.FreeAttackCards && card.Data.cardType == CardType.Attack)
+                ? 0 : card?.EffectiveApCost ?? 0;
         /// <summary>义体生命支付来自腿部效果，过载生命支付来自探索 buff；不修改共享配置。</summary>
         public bool UsesHealthFor(CardInstance card) =>
             card != null && (card.Data.category == CardCategory.Cybernetic && TurnEffects.CyberneticsPayHealth ||
@@ -33,6 +35,7 @@ namespace SpotlightGameJam
         /// <summary>只读检查费用余额，供 UI 和核心校验共用；不移动卡牌或扣资源。</summary>
         public bool CanPayCardCost(CardInstance card) => card != null && ActionPoints.CanSpend(GetEffectiveApCost(card)) &&
             (UsesHealthFor(card) ? Player.CanSpendHealth(card.Data.sanityCost) : Player.CanSpendSanity(card.Data.sanityCost));
+        private const string OverloadCardId = "OverloadCard";
         // 已成功使用的卡牌由本场战斗持有；不会因切换 UI 或新回合丢失，也不跨战斗复用。
         private readonly CardInstance[] usedCyberneticCards = new CardInstance[4];
         private int observedSanity;
@@ -47,12 +50,23 @@ namespace SpotlightGameJam
         /// <summary>仅在成功支付义体牌费用之后记录，失败或等待选牌不能改变装备栏。</summary>
         internal void RecordUsedCyberneticCard(CardInstance card)
         { usedCyberneticCards[(int)card.Source.Data.slot] = card; }
+        /// <summary>统一行动点获得入口：本回合“过载”牌在义体效果开启时写入永久行动点，否则写入临时点。</summary>
+        public void GainActionPoints(CardInstance card, int amount)
+        {
+            if (card != null && TurnEffects.OverloadApPermanent && card.Data.cardId == OverloadCardId)
+                ActionPoints.AddPermanent(amount, Rules.MaxAp);
+            else ActionPoints.AddTemporary(amount);
+        }
+        /// <summary>临时解除或恢复两套手牌容量上限；本回合生效，回合开始由控制器重置。</summary>
+        public void SetNoHandLimit(bool value) { Ordinary.SetIgnoreHandCapacity(value); Cybernetic.SetIgnoreHandCapacity(value); }
         public BattleState State { get; private set; } = BattleState.NotStarted;
         public bool IsFinished => State == BattleState.Victory || State == BattleState.Defeat;
         // 支付和状态通知可能触发外部回调；结算锁阻止回调嵌套出牌或结束回合。
         internal bool IsResolving { get; set; }
         public event Action<BattleContext> Changed;
         public event Action<BattleState> StateChanged;
+        // 完整成功出牌后发布，供“每打出一张牌”类全局效果订阅；结算期间不触发重入。
+        public event Action<CardInstance> CardPlayed;
         /// <summary>建立单场战斗上下文，关联冒险状态、牌区、敌人和随机数源。</summary>
         public BattleContext(RunState run, BattleRules rules, IReadOnlyList<CombatantState> enemies,
             CardDeck ordinary, CardDeck cybernetic, CardData phantomPain, RandomUtility random)
@@ -70,6 +84,7 @@ namespace SpotlightGameJam
             observedSanity = Player.Sanity;
             Player.Changed += OnPlayerChanged;
             Run.Buffs.Changed += OnBuffChanged;
+            Run.SetBonuses.Attach(this);
         }
         /// <summary>
         /// 切换阶段并通知订阅者；同一阶段不会重复触发事件。
@@ -85,6 +100,8 @@ namespace SpotlightGameJam
         /// 在一次完整操作结束时通知 UI 刷新；订阅者须自行解除订阅。
         /// </summary>
         internal void NotifyChanged() => Changed?.Invoke(this);
+        /// <summary>完整出牌结算后广播本次打出的牌；此时该牌已进入对应弃牌堆。</summary>
+        internal void NotifyCardPlayed(CardInstance card) => CardPlayed?.Invoke(card);
         public bool HasPhantomPain => Ordinary.Hand.Cards.Any(c => c.Data == PhantomPain);
         /// <summary>
         /// 理智归零登记持久幻痛并立即入手，满手随机弃普通牌；恢复为正数则移除当前幻痛。
@@ -116,6 +133,7 @@ namespace SpotlightGameJam
             // 会话和场景可能先后释放同一个旧上下文；重复清理不能影响新战斗的组合记录。
             if (disposed) return;
             disposed = true;
+            Run.SetBonuses.Detach(this);
             Player.Changed -= OnPlayerChanged; Run.Buffs.Changed -= OnBuffChanged;
             if (State != BattleState.NotStarted && !IsFinished) Run.Buffs.EndBattle();
         }

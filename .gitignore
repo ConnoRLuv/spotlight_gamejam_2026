@@ -123,3 +123,4 @@ __pycache__/
 /.env
 /.env.*
 issue.md
+.DS_Store
