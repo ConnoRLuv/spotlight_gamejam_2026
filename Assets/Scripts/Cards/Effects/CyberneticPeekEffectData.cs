@@ -26,7 +26,8 @@ namespace SpotlightGameJam
         /// <summary>确认选择仍在堆顶候选中，且移出使用牌后手牌容量允许取牌。</summary>
         public override bool CanExecuteRequest(BattleContext context, CardPlayRequest request) =>
             request.ChoiceId.HasValue && GetChoices(context).Any(card => card.Id == request.ChoiceId.Value) &&
-            context.Cybernetic.Hand.Count - (context.Cybernetic.Hand.Contains(request.Card) ? 1 : 0) < context.Cybernetic.Hand.Capacity;
+            (context.Cybernetic.Hand.IgnoreCapacity ||
+             context.Cybernetic.Hand.Count - (context.Cybernetic.Hand.Contains(request.Card) ? 1 : 0) < context.Cybernetic.Hand.Capacity);
 
         /// <summary>拒绝缺少候选牌身份的执行方式，提示调用方提交完整请求。</summary>
         public override void Execute(BattleContext context, CardInstance card, CombatantState target) =>

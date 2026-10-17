@@ -99,7 +99,7 @@ namespace SpotlightGameJam
             if (Context.TurnEffects.ConversionAttack.Validate().Count > 0)
                 return new CardPlayResult(CardPlayFailure.InvalidConfiguration,"转换攻击配置已失效。");
             if (!Context.ActionPoints.CanSpend(1)) return new CardPlayResult(CardPlayFailure.InsufficientAp,"需要 1 AP。");
-            if (Context.Ordinary.Hand.Count >= Context.Ordinary.Hand.Capacity) return new CardPlayResult(CardPlayFailure.HandFull,"普通手牌已满。");
+            if (!Context.Ordinary.CanAddToHand()) return new CardPlayResult(CardPlayFailure.HandFull,"普通手牌已满。");
             Context.IsResolving = true;
             try
             {

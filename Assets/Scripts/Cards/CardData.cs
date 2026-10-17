@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using SpotlightGameJam;
@@ -74,6 +74,11 @@ public class CardData : ScriptableObject
             // 交互选牌必须独占该卡效果，避免其他效果在支付后改变预先校验的候选牌区。
             if (effects != null && effects.Length > 1 && effects.Any(effect => effect && effect.RequiresChoice))
                 errors.Add("交互选牌卡只能配置一个选牌效果。");
+            // 重排抽牌堆同样必须独占，且不能与选牌混用，避免支付后牌区变化导致顺序失效。
+            if (effects != null && effects.Length > 1 && effects.Any(effect => effect && effect.RequiresReorder))
+                errors.Add("交互重排卡只能配置一个重排效果。");
+            if (effects != null && effects.Any(e => e && e.RequiresChoice) && effects.Any(e => e && e.RequiresReorder))
+                errors.Add("一张卡不能同时配置选牌与重排交互。");
         }
         return errors;
     }

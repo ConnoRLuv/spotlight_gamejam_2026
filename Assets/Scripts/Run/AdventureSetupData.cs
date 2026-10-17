@@ -4,7 +4,7 @@ using System.Linq;
 using UnityEngine;
 namespace SpotlightGameJam
 {
-    /// <summary>探索入口的共享配置：基础牌、规则、可选义体、默认选择及全局 buff。</summary>
+    /// <summary>探索入口共享配置：普通牌、义体和统一触发的组合效果，兼容新世界旧配置入口。</summary>
     [CreateAssetMenu(menuName = "Spotlight/探索/出发配置")]
     public sealed class AdventureSetupData : ScriptableObject
     {
@@ -13,6 +13,7 @@ namespace SpotlightGameJam
         public CardData[] ordinaryDeck = Array.Empty<CardData>();
         public CyberneticData[] availableCybernetics = Array.Empty<CyberneticData>();
         public CyberneticData[] defaultCybernetics = Array.Empty<CyberneticData>();
+        public NewWorldSetBonusData[] setBonuses = Array.Empty<NewWorldSetBonusData>();
         public RunBuffData[] buffs = Array.Empty<RunBuffData>();
         public int randomSeed = 1;
         /// <summary>校验实际带入的选择，允许零至四个部位，不把未装备当作错误。</summary>
@@ -41,6 +42,9 @@ namespace SpotlightGameJam
                 if (!slots.Add(data.slot)) errors.Add("同一部位只能选择一种义体。");
                 errors.AddRange(data.Validate());
             }
+            if (setBonuses == null) errors.Add("套装列表不能为空引用。");
+            else foreach (var bonus in setBonuses)
+                if (!bonus) errors.Add("套装含空引用。"); else errors.AddRange(bonus.Validate());
             if (buffs == null) errors.Add("Buff 列表不能为空引用。");
             else foreach (var buff in buffs)
                 if (!buff) errors.Add("Buff 含空引用。"); else errors.AddRange(buff.Validate());
@@ -55,6 +59,7 @@ namespace SpotlightGameJam
             var run = new RunState(rules);
             foreach (var data in chosen) run.Loadout.AddInitial(data);
             run.Buffs.Configure(buffs);
+            run.SetBonuses.Configure(setBonuses);
             return run;
         }
     }

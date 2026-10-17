@@ -39,7 +39,7 @@ namespace SpotlightGameJam
         public int Draw(int count, bool fromDiscardFirst = false)
         {
             if (count < 0) throw new ArgumentOutOfRangeException(nameof(count));
-            if (!discardOverflow && Hand.Count >= Hand.Capacity) return 0;
+            if (!discardOverflow && !CanAddToHand()) return 0;
             // 仅回收本次抽牌前的弃牌，避免溢出的牌在同一指令里被反复抽取。
             var recyclable = DiscardPile.Cards.ToList();
             int attempts = Math.Min(count, DrawPile.Count + recyclable.Count);
@@ -47,7 +47,7 @@ namespace SpotlightGameJam
             for (int i = 0; i < attempts; i++)
             {
                 // 普通手牌满时连堆顶都不移出，也不触发洗牌或产生额外弃牌。
-                if (!discardOverflow && Hand.Count >= Hand.Capacity) break;
+                if (!discardOverflow && !CanAddToHand()) break;
                 CardInstance card;
                 if (fromDiscardFirst && recyclable.Count > 0)
                 {
@@ -93,9 +93,18 @@ namespace SpotlightGameJam
         public bool TakeFromDrawPile(CardInstance card)
         {
             if (!DrawPile.Contains(card)) return false;
-            if (Hand.Count >= Hand.Capacity || !DrawPile.Contains(card) || !DrawPile.TryRemove(card)) return false;
+            if (!CanAddToHand() || !DrawPile.Contains(card) || !DrawPile.TryRemove(card)) return false;
             return Hand.TryAdd(card);
         }
+        /// <summary>返回抽牌堆当前抽取顺序（索引 0 为下一张将抽到的牌）。</summary>
+        public IReadOnlyList<CardInstance> GetDrawPileOrder() => DrawPile.Cards.Reverse().ToArray();
+        /// <summary>按“下一张在前”的顺序重排抽牌堆；列表必须恰好覆盖全部抽牌堆卡牌。</summary>
+        public bool ReorderDrawPile(IReadOnlyList<CardInstance> topFirstOrder) =>
+            topFirstOrder != null && topFirstOrder.Count == DrawPile.Count && DrawPile.Reorder(topFirstOrder.Reverse().ToArray());
+        /// <summary>查询手牌是否仍有容纳空间；无上限时始终视为有空间，供套装回收判定。</summary>
+        public bool CanAddToHand() => Hand.Count < Hand.Capacity || Hand.IgnoreCapacity;
+        /// <summary>临时解除或恢复本套手牌容量上限，本回合生效，回合开始由控制器重置。</summary>
+        internal void SetIgnoreHandCapacity(bool value) { Hand.IgnoreCapacity = value; }
         /// <summary>清理本回合生成牌，包含因其他操作进入弃牌堆的临时实例。</summary>
         internal void RemoveTurnCards()
         {
@@ -114,7 +123,7 @@ namespace SpotlightGameJam
             if (!data || !data.locksInHand) throw new ArgumentException("必须传入锁定牌配置。",nameof(data));
             // 用配置引用保证同一张锁定特殊牌不重复进入手牌。
             if (Hand.Cards.Any(card => card.Data == data)) return true;
-            if (Hand.Count >= Hand.Capacity)
+            if (!CanAddToHand())
             {
                 // 使用本场随机源保证可复现；只从普通手牌候选中选，不影响义体牌区。
                 var candidates = Hand.Cards.Where(card => !card.Data.locksInHand &&
@@ -122,7 +131,14 @@ namespace SpotlightGameJam
                 if (candidates.Length == 0) return false;
                 Discard(random.Choose(candidates));
             }
-            return Hand.TryAdd(new CardInstance(data));
+            // 无上限效果结束后可能仍超容量；锁定牌替换不能因此失败，也不扩大普通抽牌权限。
+            bool ignoreCapacity = Hand.IgnoreCapacity;
+            try
+            {
+                Hand.IgnoreCapacity = true;
+                return Hand.TryAdd(new CardInstance(data));
+            }
+            finally { Hand.IgnoreCapacity = ignoreCapacity; }
         }
         /// <summary>恢复理智时移除本套牌区中的幻痛；这是规则清除入口，不属于出牌或弃牌。</summary>
         internal void RemoveLockedCard(CardData data)

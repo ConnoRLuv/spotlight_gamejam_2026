@@ -1,0 +1,170 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6094642369ed5d44b809d29213eb818c, type: 3}
+  m_Name: MapGenerationConfig
+  m_EditorClassIdentifier: 
+  _config:
+    Rows: 15
+    Columns: 7
+    PathCount: 6
+    IncludeBossNode: 1
+    ConstrainBossApproach: 0
+    BossTypeKey: boss
+    HasStartNode: 1
+    StartTypeKey: start
+    MaxOutDegree: 3
+    BaseSeed: 0
+    MaxGenerationAttempts: 64
+    Weights:
+    - TypeKey: monster
+      BaseWeight: 45
+      WeightPerRow: -0.6
+      MinRow: 2
+      MaxRow: -1
+    - TypeKey: event
+      BaseWeight: 22
+      WeightPerRow: 0.3
+      MinRow: 2
+      MaxRow: -1
+    - TypeKey: elite
+      BaseWeight: 0
+      WeightPerRow: 1.5
+      MinRow: 5
+      MaxRow: -1
+    - TypeKey: shop
+      BaseWeight: 4
+      WeightPerRow: 0.25
+      MinRow: 5
+      MaxRow: -1
+    FixedRows:
+    - Row: 1
+      TypeKey: monster
+    - Row: 14
+      TypeKey: shop
+    FallbackOrder:
+    - monster
+    - event
+    - shop
+    MinPathCount: 8
+    MaxPathCount: 4096
+  _visuals:
+  - TypeKey: start
+    DisplayName: "\u8D77\u70B9"
+    Tags: []
+    Color: {r: 0.3, g: 0.85, b: 0.4, a: 1}
+    Icon: {fileID: 0}
+    OverlayIcon: {fileID: 0}
+    CustomPrefab: {fileID: 7155619664747911878, guid: b84f3203c878aa1459c5b26308823a8c, type: 3}
+  - TypeKey: monster
+    DisplayName: "\u6218\u6597"
+    Tags:
+    - combat
+    Color: {r: 0.75, g: 0.75, b: 0.75, a: 1}
+    Icon: {fileID: 0}
+    OverlayIcon: {fileID: 0}
+    CustomPrefab: {fileID: 1067306714525285812, guid: 1b7a89ae5e4276c4ea9ae0061428aceb, type: 3}
+  - TypeKey: elite
+    DisplayName: "\u7CBE\u82F1"
+    Tags:
+    - combat
+    - highRisk
+    Color: {r: 0.85, g: 0.3, b: 0.3, a: 1}
+    Icon: {fileID: 0}
+    OverlayIcon: {fileID: 0}
+    CustomPrefab: {fileID: 4643870033336763744, guid: 817a486671a72e1468981b89a06c94ef, type: 3}
+  - TypeKey: event
+    DisplayName: "\u4E8B\u4EF6"
+    Tags:
+    - safe
+    Color: {r: 0.4, g: 0.7, b: 0.9, a: 1}
+    Icon: {fileID: 0}
+    OverlayIcon: {fileID: 0}
+    CustomPrefab: {fileID: 2781461184979307874, guid: 2ab9fa12b66a88c439db2495ce963f78, type: 3}
+  - TypeKey: shop
+    DisplayName: "\u5546\u4EBA"
+    Tags:
+    - safe
+    Color: {r: 0.95, g: 0.8, b: 0.35, a: 1}
+    Icon: {fileID: 0}
+    OverlayIcon: {fileID: 0}
+    CustomPrefab: {fileID: 2181317326727543797, guid: 864aee0e1737b464990b94cc4a4e62bd, type: 3}
+  - TypeKey: boss
+    DisplayName: "\u9996\u9886"
+    Tags:
+    - combat
+    - terminal
+    Color: {r: 0.6, g: 0.2, b: 0.6, a: 1}
+    Icon: {fileID: 0}
+    OverlayIcon: {fileID: 0}
+    CustomPrefab: {fileID: 9027820755265350052, guid: 3e9286217b8d619439d05fecceb76cbf, type: 3}
+  _routes:
+  - Direction: 0
+    Sprite: {fileID: 0}
+    Prefab: {fileID: 0}
+    SourceEnd: {x: 0.5, y: 0}
+    TargetEnd: {x: 0.5, y: 1}
+    SourcePorts: []
+    TargetPorts: []
+  - Direction: 1
+    Sprite: {fileID: 0}
+    Prefab: {fileID: 0}
+    SourceEnd: {x: 0.5, y: 0}
+    TargetEnd: {x: 0.5, y: 1}
+    SourcePorts: []
+    TargetPorts: []
+  - Direction: 2
+    Sprite: {fileID: 0}
+    Prefab: {fileID: 0}
+    SourceEnd: {x: 0.5, y: 0}
+    TargetEnd: {x: 0.5, y: 1}
+    SourcePorts: []
+    TargetPorts: []
+  - Direction: 3
+    Sprite: {fileID: 0}
+    Prefab: {fileID: 0}
+    SourceEnd: {x: 0.5, y: 0}
+    TargetEnd: {x: 0.5, y: 1}
+    SourcePorts: []
+    TargetPorts: []
+  - Direction: 4
+    Sprite: {fileID: 0}
+    Prefab: {fileID: 0}
+    SourceEnd: {x: 0.5, y: 0}
+    TargetEnd: {x: 0.5, y: 1}
+    SourcePorts: []
+    TargetPorts: []
+  - Direction: 5
+    Sprite: {fileID: 0}
+    Prefab: {fileID: 0}
+    SourceEnd: {x: 0.5, y: 0}
+    TargetEnd: {x: 0.5, y: 1}
+    SourcePorts: []
+    TargetPorts: []
+  _useAssetConstraints: 0
+  _routeProfile:
+    Version: 1
+    NodeWidth: 130
+    NodeHeight: 130
+    NodeClearanceWidth: 0
+    NodeClearanceHeight: 0
+    ColumnSpacing: 320
+    RowSpacing: 560
+    Footprints: []
+    Templates: []
+  _constraintSprites: []
+  BackgroundSprite: {fileID: 0}
+  BackgroundPreserveAspect: 1
+  BackgroundTint: {r: 1, g: 1, b: 1, a: 1}
+  BackdropSprite: {fileID: 0}
+  BackdropTileScale: 0.25
+  BackdropPadding: 150
+  BackdropAlpha: 1

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using RoguelikeMap.Runtime;
 namespace SpotlightGameJam
 {
     /// <summary>跨场景持有一次探索及入口事件；出发只准备状态，地图流程负责决定后续场景。</summary>
@@ -12,6 +13,7 @@ namespace SpotlightGameJam
         public AdventureSetupData Setup { get; private set; }
         public int EncounterIndex { get; private set; }
         public BattleController CurrentBattle { get; private set; }
+        public MapRunState Map { get; private set; }
         public string LastError { get; private set; }
         private CardData[] ordinary = Array.Empty<CardData>();
         private int seed;
@@ -49,8 +51,15 @@ namespace SpotlightGameJam
             var candidate = setup.CreateRun(chosen);
             CurrentBattle?.Context.Dispose(); CurrentBattle = null;
             Setup = setup; ordinary = setup.ordinaryDeck.ToArray(); seed = setup.randomSeed;
-            Run = candidate; EncounterIndex = 0; LastError = null;
+            Run = candidate; Map = null; EncounterIndex = 0; LastError = null;
             ExplorationRequested?.Invoke(Run); return true;
+        }
+        /// <summary>首次生成地图时登记持久进度；返回地图时复用原对象，不覆盖已走过的路线或玩家资源。</summary>
+        public bool TryBindMap(MapRunState map)
+        {
+            if (Run == null || map == null) { LastError = "请先准备探索并生成地图。"; return false; }
+            if (Map != null && Map != map) { LastError = "本次探索已有地图，请复用已有进度。"; return false; }
+            Map = map; LastError = null; return true;
         }
         /// <summary>由战斗场景请求下一遭遇；复用探索状态，只有成功开战才增加种子序号。</summary>
         public bool TryStartEncounter(int enemyHealth, int enemyDamage)

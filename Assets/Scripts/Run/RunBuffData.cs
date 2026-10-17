@@ -41,10 +41,15 @@ namespace SpotlightGameJam
         public bool Matches(IEnumerable<CyberneticInstance> cards) => MatchesConfigurations(cards.Select(card => card.Data));
         /// <summary>匹配成功使用的义体种类；不检查结算后的耐久，最后一点耐久也算成功使用。</summary>
         internal bool MatchesConfigurations(IEnumerable<CyberneticData> played)
+            => MatchesParts(requiredCybernetics, played);
+
+        /// <summary>所有套装共用的组合匹配：同部位候选为或，四部位为且，只读取成功出牌配置。</summary>
+        internal static bool MatchesParts(IEnumerable<CyberneticData> required, IEnumerable<CyberneticData> played)
         {
+            var candidates = required?.Where(data => data).ToArray() ?? Array.Empty<CyberneticData>();
             var cards = played.ToArray();
             return Enumerable.Range(0, 4).All(part => cards.Any(card => card && (int)card.slot == part &&
-                requiredCybernetics.Any(data => data && data.slot == card.slot && data.cyberneticId == card.cyberneticId)));
+                candidates.Any(data => data.slot == card.slot && data.cyberneticId == card.cyberneticId)));
         }
     }
 }

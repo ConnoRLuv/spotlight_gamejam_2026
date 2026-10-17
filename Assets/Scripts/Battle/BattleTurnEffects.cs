@@ -9,6 +9,8 @@ namespace SpotlightGameJam
         public int ExtraTurns { get; internal set; }
         public bool DrawFromDiscardNextTurn { get; internal set; }
         public bool FreeBasicCards { get; internal set; }
+        public bool FreeAttackCards { get; internal set; }
+        public bool OverloadApPermanent { get; internal set; }
         // 此项在回合刷新时保留，仅战斗结束时清除。
         public bool CyberneticsPayHealth { get; internal set; }
 
@@ -18,15 +20,18 @@ namespace SpotlightGameJam
             // 承伤保护保留至敌人行动结束，而 AP 转换仅属于玩家行动阶段。
             DamageToSanityArmed = false;
             ConversionAttack = null;
+            OverloadApPermanent = false;
             FreeBasicCards = false;
+            FreeAttackCards = false;
         }
         /// <summary>结束玩家行动阶段，关闭仅在本阶段有效的攻击转换。</summary>
-        internal void EndPlayerAction() { ConversionAttack = null; FreeBasicCards = false; }
+        internal void EndPlayerAction() { ConversionAttack = null; FreeBasicCards = false; FreeAttackCards = false; OverloadApPermanent = false; }
         /// <summary>清空临时义体效果，包括尚未消费的额外回合。</summary>
         internal void Clear()
         {
             DamageToSanityArmed = false; ConversionAttack = null; ExtraTurns = 0;
-            DrawFromDiscardNextTurn = false; FreeBasicCards = false; CyberneticsPayHealth = false;
+            OverloadApPermanent = false;
+            DrawFromDiscardNextTurn = false; FreeBasicCards = false; FreeAttackCards = false; CyberneticsPayHealth = false;
         }
     }
 }

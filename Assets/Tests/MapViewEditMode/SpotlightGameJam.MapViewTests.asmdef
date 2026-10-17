@@ -1,0 +1,7 @@
+{
+    "name": "SpotlightGameJam.MapViewTests",
+    "references": ["RoguelikeMap.Unity", "RoguelikeMap.Core", "UnityEngine.UI"],
+    "includePlatforms": ["Editor"],
+    "optionalUnityReferences": ["TestAssemblies"],
+    "autoReferenced": false
+}
