@@ -10,8 +10,11 @@ namespace SpotlightGameJam
         private readonly HashSet<CyberneticData> playedThisTurn = new HashSet<CyberneticData>();
         private RunBuffData[] definitions = Array.Empty<RunBuffData>();
         private RunBuffData[] active = Array.Empty<RunBuffData>();
+        private NewWorldSetBonusData[] setDefinitions = Array.Empty<NewWorldSetBonusData>();
+        private NewWorldSetBonusData[] activeSets = Array.Empty<NewWorldSetBonusData>();
         private bool playerTurnActive;
         public IReadOnlyList<RunBuffData> Active => Array.AsReadOnly(active);
+        public IReadOnlyList<NewWorldSetBonusData> ActiveSets => Array.AsReadOnly(activeSets);
         public event Action Changed;
         /// <summary>保存牌归属校验入口，耐久、抽弃牌和维修均不会直接触发组合。</summary>
         public RunBuffState(CyberneticLoadout inventory)
@@ -23,6 +26,15 @@ namespace SpotlightGameJam
             if (candidates.Any(data => !data || data.Validate().Count > 0)) throw new ArgumentException("全局 Buff 配置无效。");
             definitions = candidates; playedThisTurn.Clear(); playerTurnActive = false;
             Publish(Array.Empty<RunBuffData>());
+            PublishSets(Array.Empty<NewWorldSetBonusData>());
+        }
+        /// <summary>兼容已有新世界资产，统一交给同一份成功出牌记录与战斗生命周期管理。</summary>
+        internal void ConfigureSets(IEnumerable<NewWorldSetBonusData> sets)
+        {
+            var candidates = sets?.Distinct().ToArray() ?? Array.Empty<NewWorldSetBonusData>();
+            if (candidates.Any(data => !data || data.Validate().Count > 0)) throw new ArgumentException("套装配置无效。");
+            setDefinitions = candidates;
+            PublishSets(Array.Empty<NewWorldSetBonusData>());
         }
         /// <summary>查询某种费用修饰是否存在，多条同效果组合不重复扣费。</summary>
         public bool Has(RunBuffEffect effect) => active.Any(buff => buff.effect == effect);
@@ -45,6 +57,7 @@ namespace SpotlightGameJam
         {
             playedThisTurn.Clear(); playerTurnActive = false;
             Publish(active.Where(buff => buff.duration == RunBuffDuration.Adventure).ToArray());
+            PublishSets(Array.Empty<NewWorldSetBonusData>());
         }
         /// <summary>完整成功结算后记录真实义体出牌；改造牌也可参与，失败和取消不调用。</summary>
         internal void RecordPlayed(CardInstance card)
@@ -53,6 +66,14 @@ namespace SpotlightGameJam
             playedThisTurn.Add(card.Source.Data);
             // 第四张牌先正常支付和结算，新 buff 只影响之后的操作；耐久归零不撤销成功记录。
             Publish(definitions.Where(buff => active.Contains(buff) || buff.MatchesConfigurations(playedThisTurn)).ToArray());
+            PublishSets(setDefinitions.Where(set => activeSets.Contains(set) ||
+                RunBuffData.MatchesParts(set.requiredParts, playedThisTurn)).ToArray());
+        }
+        /// <summary>发布新世界兼容视图；激活后持续到战斗结束，不读取装备或剩余耐久。</summary>
+        private void PublishSets(NewWorldSetBonusData[] next)
+        {
+            if (activeSets.SequenceEqual(next)) return;
+            activeSets = next; Changed?.Invoke();
         }
         /// <summary>仅在激活列表改变时通知，避免每次出牌重复刷新费用界面。</summary>
         private void Publish(RunBuffData[] next)

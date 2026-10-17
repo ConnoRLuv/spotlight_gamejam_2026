@@ -13,6 +13,15 @@ namespace RoguelikeMap.Unity
     [Serializable]
     public sealed class MapViewStyle
     {
+        [Header("整体显示")]
+        [Tooltip("原尺寸路线模式的整体显示倍率；节点、连线、底纹统一等比缩放，不修改美术矩形或导入尺寸。")]
+        [Range(0.05f, 1f)]
+        public float DisplayScale = 1f;
+
+        [Tooltip("原尺寸模式下地图底板占背景实际显示宽度的比例；0 使用固定倍率。参考图约为 0.65。")]
+        [Range(0f, 1f)]
+        public float BackgroundWidthRatio;
+
         [Header("间距")]
         [Tooltip("相邻两列的横向间距。路线美术是按竖长的格子画的，行距取列距的 2.3 倍左右时线条不用旋转")]
         public float ColumnSpacing = 150f;
@@ -110,7 +119,7 @@ namespace RoguelikeMap.Unity
         [SerializeField] private float _fitPadding = 40f;
 
         [Header("滚动（关掉自动缩放后生效）")]
-        [Tooltip("鼠标滚轮速度。设成 0 就不响应滚轮，只留 ScrollToNode 这类接口给外部控制")]
+        [Tooltip("滚轮上下浏览；原尺寸模式可按 Shift 横向浏览。设成 0 则不响应滚轮。")]
         [SerializeField] private float _scrollSpeed = 150f;
 
         [Header("交互")]
@@ -136,22 +145,31 @@ namespace RoguelikeMap.Unity
         }
 
         readonly Dictionary<int, MapNodeView> _nodeViews = new Dictionary<int, MapNodeView>();
+        readonly Dictionary<int, RectTransform> _nodePlacementRoots = new Dictionary<int, RectTransform>();
         readonly List<EdgeRecord> _edgeViews = new List<EdgeRecord>();
+        readonly Dictionary<int, int> _usedSocketSides = new Dictionary<int, int>();
+        Dictionary<string, MapRouteEndCoverage> _routeEndpointCoverage;
         readonly List<MapNode> _availableBuffer = new List<MapNode>(8);
 
         MapGraph _graph;
         NodeTypeCatalog _catalog;
         MapRunState _run;
+        MapPresetPrefab _presetInstance;
         bool _subscribed;
 
         RectTransform _backdropRoot;
         Image _background;
         RawImage _backdrop;
         float _scrollOffset;
+        float _horizontalOffset;
+        bool UsesNativeArtSize => _style.RouteLayout == MapRouteLayout.NativeSize;
         float _contentMinY;
         float _contentMaxY;
+        float _contentMinX;
+        float _contentMaxX;
         float _mapWidth = 1f;
         bool _layoutPending;
+        Vector2 _lastViewportSize;
 
         // 一屏几十个节点，这个提示喊一次就够了
         static bool _warnedArtNotWired;
@@ -214,15 +232,24 @@ namespace RoguelikeMap.Unity
         // LateUpdate（布局之后）里再补一次，所以挂在这儿补一次，玩家第一眼看到的位置就是对的。
         private void LateUpdate()
         {
+            // 同时检查实际视口尺寸，覆盖 Canvas 延迟布局和编辑器预览未立即通知尺寸变化的情况。
+            if (UsesNativeArtSize && _style.BackgroundWidthRatio > 0f && ((RectTransform)transform).rect.size != _lastViewportSize)
+                _layoutPending = true;
             if (!_layoutPending) return;
             _layoutPending = false;
             LayoutBackdrop();
             ApplyViewTransform();
         }
 
+        private void OnRectTransformDimensionsChange()
+        {
+            // 窗口尺寸改变后重新按背景宽度计算，避免只在首次打开时比例正确。
+            _layoutPending = true;
+        }
+
         private void HandleScrollInput()
         {
-            if (_autoFitToViewport) return;
+            if (_autoFitToViewport && !UsesNativeArtSize) return;
             if (_scrollSpeed <= 0f) return;
             if (_graph == null || _nodeViews.Count == 0) return;
 
@@ -230,7 +257,9 @@ namespace RoguelikeMap.Unity
             if (Mathf.Abs(wheel) < 0.001f) return;
 
             // 滚轮往上 → 内容往下走 → 看见地图更上面的一层
-            _scrollOffset -= wheel * _scrollSpeed;
+            if (UsesNativeArtSize && (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)))
+                _horizontalOffset += wheel * _scrollSpeed;
+            else _scrollOffset -= wheel * _scrollSpeed;
             ApplyViewTransform();
         }
 
@@ -299,19 +328,24 @@ namespace RoguelikeMap.Unity
 
             if (_graph == null) return;
 
+            _routeEndpointCoverage = ConfigAsset != null ? ConfigAsset.BuildRouteEndpointCoverage() : null;
+
             EnsureContainers();
 
-            for (int i = 0; i < _graph.Nodes.Count; i++)
-                CreateNode(_graph.Nodes[i]);
-
-            for (int i = 0; i < _graph.Nodes.Count; i++)
+            var preset = ConfigAsset != null ? ConfigAsset.FindPreGeneratedMapPrefab(_graph) : null;
+            if (preset != null) BindPreset(preset);
+            else
             {
-                MapNode node = _graph.Nodes[i];
-                Vector2 from = GetPosition(node);
-                for (int j = 0; j < node.NextIds.Count; j++)
+                for (int i = 0; i < _graph.Nodes.Count; i++) CreateNode(_graph.Nodes[i]);
+                for (int i = 0; i < _graph.Nodes.Count; i++)
                 {
-                    MapNode to = _graph.Get(node.NextIds[j]);
-                    if (to != null) CreateEdge(node, to, from, GetPosition(to));
+                    MapNode node = _graph.Nodes[i];
+                    Vector2 from = GetPosition(node);
+                    for (int j = 0; j < node.NextIds.Count; j++)
+                    {
+                        MapNode to = _graph.Get(node.NextIds[j]);
+                        if (to != null) CreateEdge(node, to, from, GetPosition(to));
+                    }
                 }
             }
 
@@ -319,7 +353,7 @@ namespace RoguelikeMap.Unity
             LayoutBackdrop();
 
             // 长地图：镜头先对准玩家当前所在的节点（开局就是起点）；没有起点节点时才回到底部
-            if (!_autoFitToViewport)
+            if (!_autoFitToViewport || UsesNativeArtSize)
             {
                 if (_run != null && _run.CurrentNodeId != MapRunState.NoNode) ScrollToNode(_run.CurrentNodeId);
                 else _scrollOffset = float.MaxValue;
@@ -329,15 +363,59 @@ namespace RoguelikeMap.Unity
             RefreshInteractivity();
         }
 
+        private void BindPreset(MapPresetPrefab prefab)
+        {
+            _presetInstance = Instantiate(prefab, _nodeRoot, false);
+            foreach (var binding in _presetInstance.Nodes)
+            {
+                var node = _graph.Get(binding.NodeId);
+                if (binding.View == null)
+                {
+                    var visual = ResolveTypeVisual(node.TypeKey);
+                    var icon = Instantiate(visual.CustomPrefab, binding.PlacementRoot, false);
+                    icon.name = visual.CustomPrefab.name;
+                    var rect = (RectTransform)icon.transform;
+                    rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(.5f, .5f);
+                    rect.sizeDelta = visual.Icon.rect.size;
+                    rect.anchoredPosition = Vector2.zero;
+                    float scale = Mathf.Max(1f, (binding.PlacementRoot.rect.width + 4) / rect.rect.width,
+                        (binding.PlacementRoot.rect.height + 4) / rect.rect.height);
+                    rect.localScale = new Vector3(scale, scale, 1);
+                    rect.localRotation = Quaternion.identity;
+                    binding.View = icon.GetComponent<MapNodeView>() ?? icon.AddComponent<MapNodeView>();
+                }
+                binding.View.Bind(node, BuildNodeVisual(node, ResolveTypeVisual(node.TypeKey)), _style.ShowLabels, _style.ShowAvailableHighlight);
+                binding.View.Clicked += HandleNodeClicked;
+                _nodeViews.Add(node.Id, binding.View);
+                if (binding.PlacementRoot != null) _nodePlacementRoots.Add(node.Id, binding.PlacementRoot);
+            }
+            foreach (var binding in _presetInstance.Edges)
+            {
+                var placement = _graph.AssetLayout.FindEdge(binding.FromId, binding.ToId);
+                binding.View.BindBakedTemplate(ConfigAsset.RouteProfile.FindTemplate(placement.TemplateId), _style.EdgeColor);
+                _edgeViews.Add(new EdgeRecord(binding.View, binding.FromId, binding.ToId));
+            }
+        }
+
         public void Clear()
         {
-            foreach (KeyValuePair<int, MapNodeView> pair in _nodeViews)
-                if (pair.Value != null) Destroy(pair.Value.gameObject);
+            if (_presetInstance != null)
+            {
+                _presetInstance.gameObject.SetActive(false);
+                Destroy(_presetInstance.gameObject);
+                _presetInstance = null;
+            }
+            else
+            {
+                foreach (KeyValuePair<int, MapNodeView> pair in _nodeViews)
+                    if (pair.Value != null) Destroy(pair.Value.gameObject);
+                for (int i = 0; i < _edgeViews.Count; i++)
+                    if (_edgeViews[i].View != null) Destroy(_edgeViews[i].View.gameObject);
+            }
             _nodeViews.Clear();
-
-            for (int i = 0; i < _edgeViews.Count; i++)
-                if (_edgeViews[i].View != null) Destroy(_edgeViews[i].View.gameObject);
+            _nodePlacementRoots.Clear();
             _edgeViews.Clear();
+            _usedSocketSides.Clear();
 
             _run = null;
         }
@@ -403,6 +481,9 @@ namespace RoguelikeMap.Unity
         public Vector2 GetPosition(MapNode node)
         {
             if (_graph == null) return Vector2.zero;
+            if (_nodePlacementRoots.TryGetValue(node.Id, out var root)) return root.anchoredPosition;
+            var placement = _graph.AssetLayout?.FindNode(node.Id);
+            if (placement != null) return new Vector2(placement.X, placement.Y);
             float x = (node.Column - (_graph.Columns - 1) * 0.5f) * _style.ColumnSpacing;
             float y = node.Row * _style.RowSpacing;
             return new Vector2(x, y);
@@ -453,6 +534,8 @@ namespace RoguelikeMap.Unity
             }
 
             _mapWidth = Mathf.Max(max.x - min.x, 1f);
+            _contentMinX = min.x;
+            _contentMaxX = max.x;
 
             MapGenerationConfigAsset asset = ConfigAsset;
             float pad = asset != null ? Mathf.Max(asset.BackdropPadding, 0f) : 0f;
@@ -460,7 +543,7 @@ namespace RoguelikeMap.Unity
             _contentMaxY = max.y + pad;
         }
 
-        // 底纹：按地图范围铺一张可平铺的图，跟着地图一起滚。
+        // 底纹：单张图片拉伸铺满地图范围，跟着地图一起滚，不循环复制。
         private void LayoutBackdrop()
         {
             if (_backdropRoot == null) return;
@@ -504,16 +587,9 @@ namespace RoguelikeMap.Unity
             rect.sizeDelta = new Vector2(width, height);
             rect.anchoredPosition = new Vector2(0f, (_contentMinY + _contentMaxY) * 0.5f);
 
-            // 贴图坐标超过 1 就是平铺；贴图要设成循环平铺（Repeat）模式，不然接缝会被拉成一条线
-            if (texture.wrapMode != TextureWrapMode.Repeat)
-                texture.wrapMode = TextureWrapMode.Repeat;
-
-            float tileScale = Mathf.Max(asset.BackdropTileScale, 0.01f);
-            float tileWidth = Mathf.Max(sprite.rect.width * tileScale, 8f);
-            float tileHeight = Mathf.Max(sprite.rect.height * tileScale, 8f);
-
             _backdrop.texture = texture;
-            _backdrop.uvRect = new Rect(0f, 0f, width / tileWidth, height / tileHeight);
+            // 完整纹理只采样一次。仅底纹按用户确认拉伸，节点和连线仍保持各自原始比例。
+            _backdrop.uvRect = new Rect(0f, 0f, 1f, 1f);
             _backdrop.color = new Color(1f, 1f, 1f, asset.BackdropAlpha);
         }
 
@@ -521,13 +597,14 @@ namespace RoguelikeMap.Unity
         {
             _layoutPending = false;
 
-            if (_autoFitToViewport)
+            if (_autoFitToViewport && !UsesNativeArtSize)
             {
                 ApplyFit();
                 return;
             }
 
             var viewport = (RectTransform)transform;
+            _lastViewportSize = viewport.rect.size;
             float viewportHeight = viewport.rect.height;
             if (viewportHeight <= 1f)
             {
@@ -535,8 +612,8 @@ namespace RoguelikeMap.Unity
                 return;
             }
 
-            // 横向装不下就整体缩一点，纵向靠滚动，所以不参与缩放
-            float scale = Mathf.Clamp(viewport.rect.width / _mapWidth, 0.05f, 1f);
+            // 原尺寸布局仅在公共容器上统一缩放，路线和节点自身仍保持原始尺寸。
+            float scale = ResolveScrollScale(viewport);
 
             float top = viewportHeight * 0.5f - _contentMaxY * scale;      // 顶到地图上面
             float bottom = -viewportHeight * 0.5f - _contentMinY * scale;  // 顶到地图下面
@@ -545,10 +622,37 @@ namespace RoguelikeMap.Unity
             if (top >= bottom) _scrollOffset = (top + bottom) * 0.5f;
             else _scrollOffset = Mathf.Clamp(_scrollOffset, top, bottom);
 
-            var offset = new Vector2(0f, _scrollOffset);
+            if (!UsesNativeArtSize) _horizontalOffset = 0;
+            else if (_mapWidth * scale <= viewport.rect.width) _horizontalOffset = -(_contentMinX + _contentMaxX) * 0.5f * scale;
+            else
+            {
+                // 剪枝可能只留下右侧或左侧列，不能假定实际内容以零为中心。
+                float halfWidth = viewport.rect.width * 0.5f;
+                _horizontalOffset = Mathf.Clamp(_horizontalOffset, halfWidth - _contentMaxX * scale, -halfWidth - _contentMinX * scale);
+            }
+            var offset = new Vector2(_horizontalOffset, _scrollOffset);
             ApplyContainer(_backdropRoot, scale, offset);
             ApplyContainer(_edgeRoot, scale, offset);
             if (_nodeRoot != _edgeRoot) ApplyContainer(_nodeRoot, scale, offset);
+        }
+
+        /// <summary>统一计算滚动布局的显示倍率，确保节点定位和滚动边界使用同一坐标尺度。</summary>
+        private float ResolveScrollScale(RectTransform viewport)
+        {
+            if (!UsesNativeArtSize) return Mathf.Clamp(viewport.rect.width / _mapWidth, 0.05f, 1f);
+            if (_style.BackgroundWidthRatio <= 0f) return Mathf.Clamp(_style.DisplayScale, 0.05f, 1f);
+
+            var asset = ConfigAsset;
+            float width = viewport.rect.width;
+            if (_background != null && _background.sprite != null && _background.preserveAspect)
+            {
+                // 使用保持原比例后真正可见的背景宽度，不能把上下或左右留白算入背景。
+                var spriteSize = _background.sprite.rect.size;
+                width = Mathf.Min(width, viewport.rect.height * spriteSize.x / Mathf.Max(spriteSize.y, 1f));
+            }
+            float padding = asset != null ? Mathf.Max(asset.BackdropPadding, 0f) : 0f;
+            float boardWidth = _mapWidth + padding * 2f;
+            return Mathf.Max(0.01f, width * Mathf.Clamp01(_style.BackgroundWidthRatio) / Mathf.Max(boardWidth, 1f));
         }
 
         // 把整张图缩放并居中到当前 UI 矩形（RectTransform）的范围里（一屏总览）。
@@ -621,14 +725,15 @@ namespace RoguelikeMap.Unity
         // 把某个节点滚到视口中间，适合"走完一步之后镜头跟过去"。
         public void ScrollToNode(int nodeId)
         {
-            if (_autoFitToViewport || _graph == null) return;
+            if (_autoFitToViewport && !UsesNativeArtSize || _graph == null) return;
             MapNode node = _graph.Get(nodeId);
             if (node == null) return;
 
             var viewport = (RectTransform)transform;
             if (viewport.rect.height <= 1f) return;
 
-            float scale = Mathf.Clamp(viewport.rect.width / _mapWidth, 0.05f, 1f);
+            float scale = ResolveScrollScale(viewport);
+            if (UsesNativeArtSize) _horizontalOffset = -GetPosition(node).x * scale;
             _scrollOffset = -GetPosition(node).y * scale;
             ApplyViewTransform();
         }
@@ -656,6 +761,11 @@ namespace RoguelikeMap.Unity
             }
 
             go.name = "Node_" + node.Id + "_" + node.TypeKey;
+
+            // 原尺寸模式下各房间图标保留自身像素矩形，不能统一压成 _nodeSize。
+            // 在 Bind 创建高亮之前设置尺寸，高亮和点击区域随原图一起确定。
+            if (UsesNativeArtSize && visual != null && MapSpriteFactory.IsUsable(visual.Icon))
+                ((RectTransform)go.transform).sizeDelta = visual.Icon.rect.size;
 
             var view = go.GetComponent<MapNodeView>();
             if (view == null) view = go.AddComponent<MapNodeView>();
@@ -770,6 +880,32 @@ namespace RoguelikeMap.Unity
 
         private void CreateEdge(MapNode from, MapNode to, Vector2 fromPos, Vector2 toPos)
         {
+            if (_graph.AssetLayout != null)
+            {
+                var placement = _graph.AssetLayout.FindEdge(from.Id, to.Id);
+                var asset = ConfigAsset;
+                var art = placement != null && asset != null ? asset.FindConstraintSprite(placement.FootprintId) : null;
+                if (placement == null || !art)
+                { Debug.LogError("[地图布局] 保存的连线或图片缺失：" + from.Id + "→" + to.Id); return; }
+                GameObject bakedPrefab = null;
+                foreach (var routeArt in asset.Routes)
+                    if (routeArt.Sprite == art && routeArt.Prefab != null) { bakedPrefab = routeArt.Prefab; break; }
+                var placedObject = bakedPrefab != null ? Instantiate(bakedPrefab, _edgeRoot, false) : BuildDefaultEdge(art, null);
+                placedObject.transform.SetParent(_edgeRoot, false);
+                placedObject.name = "Edge_" + from.Id + "_" + to.Id + "_Asset";
+                var placedView = placedObject.GetComponent<MapEdgeView>();
+                if (placedView == null) placedView = placedObject.AddComponent<MapEdgeView>();
+                placedView.SetSprite(art, _style.EdgeColor);
+                placedView.PlaceBaked(placement.X, placement.Y, asset.RouteProfile.FindTemplate(placement.TemplateId));
+                _edgeViews.Add(new EdgeRecord(placedView, from.Id, to.Id));
+                return;
+            }
+            if (_style.RouteLayout == MapRouteLayout.NativeSize && ConfigAsset != null &&
+                ConfigAsset.RouteProfile != null && ConfigAsset.RouteProfile.Templates.Count > 0)
+            {
+                CreateSocketEdge(from, to, fromPos, toPos);
+                return;
+            }
             MapRouteDirection direction = ResolveDirection(toPos - fromPos);
             MapRouteVisual route = ResolveRoute(direction);
             Sprite sprite = route != null ? route.Sprite : null;
@@ -794,11 +930,23 @@ namespace RoguelikeMap.Unity
             var view = go.GetComponent<MapEdgeView>();
             if (view == null) view = go.AddComponent<MapEdgeView>();
 
-            if (route != null) view.Configure(route.TargetEnd, _style.RouteLengthScale, _style.RouteTrim);
+            if (route != null)
+            {
+                ((RectTransform)go.transform).pivot = route.SourceEnd;
+                view.Configure(route.TargetEnd, _style.RouteLengthScale, _style.RouteTrim);
+            }
             else view.ConfigureLayout(_style.RouteLengthScale, _style.RouteTrim);
 
             view.SetSprite(sprite, _style.EdgeColor);
-            view.Place(fromPos, toPos, _style.RouteLayout, _style.EdgeThickness);
+            if (_style.RouteLayout == MapRouteLayout.NativeSize && route != null && sprite != null)
+            {
+                // 只接入节点中心内核，不能把图标透明外框当作已连接区域。
+                var sourceSize = Vector2.Min(((RectTransform)_nodeViews[from.Id].transform).rect.size, _nodeSize);
+                var targetSize = Vector2.Min(((RectTransform)_nodeViews[to.Id].transform).rect.size, _nodeSize);
+                if (!view.PlaceProportional(fromPos, toPos, route, sourceSize, targetSize))
+                    throw new InvalidOperationException("连接线无法保持比例接入两端节点，请调整地图间距：" + from.Id + "→" + to.Id);
+            }
+            else view.Place(fromPos, toPos, _style.RouteLayout, _style.EdgeThickness);
 
             _edgeViews.Add(new EdgeRecord(view, from.Id, to.Id));
         }
@@ -807,6 +955,37 @@ namespace RoguelikeMap.Unity
         {
             MapGenerationConfigAsset asset = ConfigAsset;
             return asset != null ? asset.GetRoute(direction) : null;
+        }
+
+        private void CreateSocketEdge(MapNode from, MapNode to, Vector2 fromPos, Vector2 toPos)
+        {
+            _usedSocketSides.TryGetValue(from.Id, out int sourceMask);
+            _usedSocketSides.TryGetValue(to.Id, out int targetMask);
+            if (!MapRouteSocketSelector.TrySelect(ConfigAsset.RouteProfile, to.Column - from.Column,
+                ConnectionBounds(from, fromPos), ConnectionBounds(to, toPos), sourceMask, targetMask, out var fit, _routeEndpointCoverage))
+                throw new InvalidOperationException("没有可保持原图比例的节点侧面接法：" + from.Id + "→" + to.Id);
+            var sprite = ConfigAsset.FindConstraintSprite(fit.Template.FootprintId);
+            if (sprite == null) throw new InvalidOperationException("接点模板缺少连线图片：" + fit.Template.Id);
+            GameObject prefab = null;
+            foreach (var route in ConfigAsset.Routes)
+                if (route.Sprite == sprite && route.Prefab != null) { prefab = route.Prefab; break; }
+            var owner = prefab != null ? Instantiate(prefab, _edgeRoot, false) : BuildDefaultEdge(sprite, null);
+            owner.transform.SetParent(_edgeRoot, false);
+            owner.name = "Edge_" + from.Id + "_" + to.Id + "_Socket";
+            var edge = owner.GetComponent<MapEdgeView>();
+            if (edge == null) edge = owner.AddComponent<MapEdgeView>();
+            edge.SetSprite(sprite, _style.EdgeColor);
+            edge.PlaceSocketTemplate(fit);
+            _usedSocketSides[from.Id] = sourceMask | 1 << (int)fit.Template.SourceSide;
+            _usedSocketSides[to.Id] = targetMask | 1 << (int)fit.Template.TargetSide;
+            _edgeViews.Add(new EdgeRecord(edge, from.Id, to.Id));
+        }
+
+        private RouteFitBounds ConnectionBounds(MapNode node, Vector2 position)
+        {
+            var size = Vector2.Min(((RectTransform)_nodeViews[node.Id].transform).rect.size, _nodeSize);
+            var half = Vector2.Max(size * 0.5f - new Vector2(2, 2), Vector2.one);
+            return new RouteFitBounds(position.x - half.x, position.y - half.y, position.x + half.x, position.y + half.y);
         }
 
         private GameObject BuildDefaultEdge(Sprite sprite, MapRouteVisual route)

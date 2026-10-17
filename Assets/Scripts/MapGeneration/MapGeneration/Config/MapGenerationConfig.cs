@@ -56,6 +56,9 @@ namespace RoguelikeMap.Config
         /// <summary>是否在最后额外挂一个 Boss 节点。</summary>
         public bool IncludeBossNode = true;
 
+        /// <summary>接近首领时逐层收拢路径，使首领入口只来自同列或相邻列；默认关闭以兼容旧地图。</summary>
+        public bool ConstrainBossApproach;
+
         public string BossTypeKey = NodeTypeKeys.Boss;
 
         /// <summary>是否生成唯一的起点节点（第 0 层只有一个点，所有路径从它分叉出去）。</summary>
@@ -145,6 +148,7 @@ namespace RoguelikeMap.Config
                 Columns = Columns,
                 PathCount = PathCount,
                 IncludeBossNode = IncludeBossNode,
+                ConstrainBossApproach = ConstrainBossApproach,
                 BossTypeKey = BossTypeKey,
                 HasStartNode = HasStartNode,
                 StartTypeKey = StartTypeKey,
@@ -195,7 +199,8 @@ namespace RoguelikeMap.Config
                     h = h * 31 + w.MinRow;
                     h = h * 31 + w.MaxRow;
                 }
-                return h;
+                // 关闭时保留旧配置指纹，避免未启用该功能的存档发生无意义变化。
+                return ConstrainBossApproach ? h * 31 + 1 : h;
             }
         }
     }

@@ -75,7 +75,7 @@ namespace SpotlightGameJam.Editor
             var bonus = Asset<NewWorldSetBonusData>(SetBonusPath, value =>
             {
                 value.setId = SetId; value.setName = "Type-00：新世界";
-                value.description = "穿戴一整套后，每当你打出一张牌，将弃牌堆中的一张基本牌加入手牌；手牌已满则不再获得。";
+                value.description = "同一回合成功打出新世界四部位后，本场战斗每次成功出牌回收一张基本牌；手牌已满则不回收。";
                 value.requiredParts = sources;
                 value.trigger = NewWorldSetTrigger.OnAnyCardPlayed;
                 value.effect = NewWorldSetEffect.ReturnBasicFromDiscard;

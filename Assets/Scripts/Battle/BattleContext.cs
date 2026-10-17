@@ -25,7 +25,9 @@ namespace SpotlightGameJam
         public BattleTurnEffects TurnEffects { get; } = new BattleTurnEffects();
         /// <summary>获得实际 AP 费用，本回合免费效果只作用于基本牌，不修改共享配置。</summary>
         public int GetEffectiveApCost(CardInstance card) =>
-            card != null && card.Data.category == CardCategory.Basic && TurnEffects.FreeBasicCards ? 0 : card?.EffectiveApCost ?? 0;
+            card != null && card.Data.category == CardCategory.Basic &&
+            (TurnEffects.FreeBasicCards || TurnEffects.FreeAttackCards && card.Data.cardType == CardType.Attack)
+                ? 0 : card?.EffectiveApCost ?? 0;
         /// <summary>义体生命支付来自腿部效果，过载生命支付来自探索 buff；不修改共享配置。</summary>
         public bool UsesHealthFor(CardInstance card) =>
             card != null && (card.Data.category == CardCategory.Cybernetic && TurnEffects.CyberneticsPayHealth ||

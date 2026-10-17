@@ -48,8 +48,8 @@ namespace SpotlightGameJam
         {
             if (!rules || rules.Validate().Count > 0) throw new ArgumentException("战斗规则配置不合法。");
             Player = new CombatantState("player",rules.MaxHealth,rules.MaxSanity);
-            SetBonuses = new NewWorldSetBonusState(Loadout);
             Buffs = new RunBuffState(Loadout);
+            SetBonuses = new NewWorldSetBonusState(Buffs);
             Player.Changed += OnPlayerChanged;
             rewardView = rewards.AsReadOnly();
         }

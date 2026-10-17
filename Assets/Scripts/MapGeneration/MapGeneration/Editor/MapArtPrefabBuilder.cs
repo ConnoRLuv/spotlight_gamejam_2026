@@ -332,12 +332,42 @@ namespace RoguelikeMap.EditorTools
         // 做法：沿四条边找 alpha 不为空的一段段"接触区"，把挨在一起的接触区（同一条线段的端头）
         // 归成一组，每组的重心就是一个端点。手绘线段的端头通常正好顶到图片边缘，所以这样很稳。
         static bool TryDetectEndpoints(string fileName, bool sourceIsBottom, out Vector2 sourceEnd, out Vector2 targetEnd)
+            => TryDetectEndpointsAtPath(Path.GetFullPath(ArtFolder + "/" + fileName), sourceIsBottom, out sourceEnd, out targetEnd);
+
+        /// <summary>按实际 Sprite 资源路径校准端点，兼容美术目录移动，不重建节点或路线预制体。</summary>
+        public static bool TryDetectRouteEndpoints(Sprite sprite, bool sourceIsBottom, out Vector2 sourceEnd, out Vector2 targetEnd)
+        {
+            string path = sprite != null ? AssetDatabase.GetAssetPath(sprite.texture) : string.Empty;
+            string full = Path.Combine(Path.GetDirectoryName(Application.dataPath), path);
+            return TryDetectEndpointsAtPath(full, sourceIsBottom, out sourceEnd, out targetEnd);
+        }
+
+        /// <summary>保留所有触边线头的像素中心，原尺寸补线应接实际线头，而不是两个线头之间的平均点。</summary>
+        public static Vector2[] DetectRoutePorts(Sprite sprite, Vector2 endpoint)
+        {
+            string path = AssetDatabase.GetAssetPath(sprite.texture);
+            var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            try
+            {
+                texture.LoadImage(File.ReadAllBytes(Path.Combine(Path.GetDirectoryName(Application.dataPath), path)));
+                var contacts = new List<Vector2>();
+                CollectBorderContacts(texture.GetPixels32(), texture.width, texture.height, 24, contacts);
+                var selected = new List<Vector2>();
+                foreach (var port in contacts)
+                    if (endpoint.x > 0.3f && endpoint.x < 0.7f
+                        ? Mathf.Abs(port.y - endpoint.y) < 0.01f
+                        : Vector2.Distance(port, endpoint) < 0.35f) selected.Add(port);
+                return selected.ToArray();
+            }
+            finally { UnityEngine.Object.DestroyImmediate(texture); }
+        }
+
+        /// <summary>从源图片透明边缘提取路线两端；装饰圆环不作为节点连接端点。</summary>
+        static bool TryDetectEndpointsAtPath(string full, bool sourceIsBottom, out Vector2 sourceEnd, out Vector2 targetEnd)
         {
             sourceEnd = new Vector2(0.5f, sourceIsBottom ? 0f : 1f);
             targetEnd = new Vector2(0.5f, sourceIsBottom ? 1f : 0f);
 
-            string path = ArtFolder + "/" + fileName;
-            string full = Path.GetFullPath(path);
             if (!File.Exists(full)) return false;
 
             var texture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
@@ -375,7 +405,7 @@ namespace RoguelikeMap.EditorTools
             }
             catch (Exception e)
             {
-                Debug.LogWarning("[MapArtPrefabBuilder] 读像素失败（" + fileName + "）：" + e.Message);
+                Debug.LogWarning("[MapArtPrefabBuilder] 读像素失败（" + Path.GetFileName(full) + "）：" + e.Message);
                 return false;
             }
             finally

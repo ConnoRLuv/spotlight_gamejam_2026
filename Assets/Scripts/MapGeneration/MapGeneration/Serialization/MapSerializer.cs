@@ -24,6 +24,8 @@ namespace RoguelikeMap.Serialization
         public uint Seed;
         public int Attempt;
         public int ConfigHash;
+        public int StartNodeId = -1;
+        public MapAssetLayout AssetLayout;
         public List<MapNodeDto> Nodes = new List<MapNodeDto>();
     }
 
@@ -41,6 +43,8 @@ namespace RoguelikeMap.Serialization
         public int ConfigHash;
         public int CurrentNodeId = MapRunState.NoNode;
         public List<int> VisitedNodeIds = new List<int>();
+        /// <summary>约束地图保存完整布局，旧种子存档仍保持 null 并沿用旧恢复方式。</summary>
+        public MapGraphDto Graph;
     }
 
     /// <summary>
@@ -59,7 +63,9 @@ namespace RoguelikeMap.Serialization
                 Columns = graph.Columns,
                 Seed = graph.Seed,
                 Attempt = graph.Attempt,
-                ConfigHash = configHash
+                ConfigHash = configHash,
+                StartNodeId = graph.StartNodeId,
+                AssetLayout = CopyLayout(graph.AssetLayout)
             };
 
             for (int i = 0; i < graph.Nodes.Count; i++)
@@ -86,7 +92,9 @@ namespace RoguelikeMap.Serialization
                 Rows = dto.Rows,
                 Columns = dto.Columns,
                 Seed = dto.Seed,
-                Attempt = dto.Attempt
+                Attempt = dto.Attempt,
+                StartNodeId = dto.StartNodeId,
+                AssetLayout = CopyLayout(dto.AssetLayout)
             };
 
             if (dto.Nodes == null) return graph;
@@ -95,10 +103,7 @@ namespace RoguelikeMap.Serialization
             for (int i = 0; i < dto.Nodes.Count; i++)
             {
                 MapNodeDto n = dto.Nodes[i];
-                MapNode node = graph.AddNode(n.Row, n.Column, n.TypeKey);
-                if (node.Id != n.Id)
-                    throw new InvalidOperationException(
-                        "节点 Id 与重建顺序不一致，请确认 DTO 是按原始顺序保存的");
+                graph.AddRestoredNode(n.Id, n.Row, n.Column, n.TypeKey);
             }
 
             for (int i = 0; i < dto.Nodes.Count; i++)
@@ -121,13 +126,25 @@ namespace RoguelikeMap.Serialization
                 Seed = graph.Seed,
                 Attempt = graph.Attempt,
                 ConfigHash = configHash,
-                CurrentNodeId = state != null ? state.CurrentNodeId : MapRunState.NoNode
+                CurrentNodeId = state != null ? state.CurrentNodeId : MapRunState.NoNode,
+                Graph = graph.AssetLayout != null ? ToDto(graph, configHash) : null
             };
 
             if (state != null)
                 foreach (int id in state.VisitedNodeIds) snapshot.VisitedNodeIds.Add(id);
 
             return snapshot;
+        }
+
+        /// <summary>复制布局快照，避免修改 DTO 或存档时反向改变正在探索的地图。</summary>
+        private static MapAssetLayout CopyLayout(MapAssetLayout source)
+        {
+            if (source == null) return null;
+            var result = new MapAssetLayout { Version = source.Version, ProfileHash = source.ProfileHash };
+            foreach (var n in source.Nodes) result.Nodes.Add(new MapNodePlacement { NodeId = n.NodeId, X = n.X, Y = n.Y });
+            foreach (var e in source.Edges) result.Edges.Add(new MapEdgePlacement { FromId = e.FromId, ToId = e.ToId, X = e.X, Y = e.Y,
+                TemplateId = e.TemplateId, FootprintId = e.FootprintId, SourceSide = e.SourceSide, TargetSide = e.TargetSide });
+            return result;
         }
     }
 }

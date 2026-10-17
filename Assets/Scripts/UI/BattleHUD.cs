@@ -127,7 +127,7 @@ namespace SpotlightGameJam.UI
             if (battle != null) battle.Context.Changed -= OnBattleChanged;
             if (discardPanel) discardPanel.Bind(null);
 
-            if (brainPanel) brainPanel.Close();
+            if (brainPanel) brainPanel.Close(0);
             if (drawPilePanel) drawPilePanel.Bind(null);
             foreach (var slot in equipmentSlots) if (slot) slot.Refresh(null);
             battle = null;

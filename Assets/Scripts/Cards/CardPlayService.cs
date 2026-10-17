@@ -122,10 +122,10 @@ namespace SpotlightGameJam
                 }
                 // 执行期间暂不放入弃牌堆，防止本张牌的抽牌效果立即重抽自身。
                 if (!card.ExpiresAtTurnEnd) deck.DiscardPile.TryAdd(card);
-                // 完整出牌后广播，供“每打出一张牌”类套装效果回收弃牌；此时本牌已进入弃牌堆。
-                if (!context.IsFinished) context.NotifyCardPlayed(card);
                 // 只有完整结算成功且战斗仍在进行时才累计组合；本牌费用不被自身新触发的 buff 改写。
                 if (isCybernetic && !context.IsFinished) context.Run.Buffs.RecordPlayed(card);
+                // 四部位已成功结算后激活被动，再广播本次成功出牌；第四张的费用与牌效已按旧状态完成。
+                if (!context.IsFinished) context.NotifyCardPlayed(card);
                 context.NotifyChanged();
                 return CardPlayResult.Played;
             }

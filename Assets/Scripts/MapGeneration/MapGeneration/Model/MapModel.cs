@@ -71,6 +71,9 @@ namespace RoguelikeMap.Model
         /// <summary>第几次尝试生成成功，仅用于调试与复现。</summary>
         public int Attempt;
 
+        /// <summary>可选资产约束布局；旧地图保留 null，显示层继续使用原先网格。</summary>
+        public MapAssetLayout AssetLayout;
+
         /// <summary>
         /// 起点节点 Id。单一起点模式下由铺路径步骤设置，否则保持 -1。
         /// 玩家一开始就站在这个节点上，从这里向上一层层分叉。
@@ -129,6 +132,16 @@ namespace RoguelikeMap.Model
             if (HasNodeAt(row, column))
                 throw new InvalidOperationException("格子 " + row + "," + column + " 已经有节点了");
             return GetOrCreate(row, column, typeKey);
+        }
+
+        /// <summary>恢复原始身份，兼容删除过节点后出现的不连续 Id，避免探索进度指向错误节点。</summary>
+        internal MapNode AddRestoredNode(int id, int row, int column, string typeKey)
+        {
+            if (id < 0 || _byId.ContainsKey(id) || HasNodeAt(row, column)) throw new InvalidOperationException("存档节点身份或坐标重复。");
+            var node = GetOrCreate(row, column, typeKey);
+            _byId.Remove(node.Id); node.Id = id; _byId[id] = node; _byCoord[new GridCoord(row, column)] = id;
+            _nextId = Math.Max(_nextId, id + 1);
+            return node;
         }
 
         public void AddEdge(int fromId, int toId)

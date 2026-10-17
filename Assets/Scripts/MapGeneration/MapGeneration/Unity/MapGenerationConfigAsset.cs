@@ -1,10 +1,16 @@
 using System.Collections.Generic;
 using RoguelikeMap.Config;
 using RoguelikeMap.Model;
+using RoguelikeMap.Generation;
+using RoguelikeMap.Serialization;
 using UnityEngine;
 
 namespace RoguelikeMap.Unity
 {
+    /// <summary>烘焙占用标识与显示图片的绑定；纯数据生成器不保存 Sprite 引用。</summary>
+    [System.Serializable]
+    public sealed class MapConstraintSpriteBinding { public string FootprintId; public Sprite Sprite; }
+
     // 一种房间类型在编辑器里配置的表现数据。核心逻辑完全不读它。
     [System.Serializable]
     public sealed class NodeTypeVisual
@@ -49,6 +55,10 @@ namespace RoguelikeMap.Unity
 
         [Tooltip("终点端在图片里的归一化位置")]
         public Vector2 TargetEnd = new Vector2(0.5f, 1f);
+
+        [Tooltip("原尺寸模式的实际像素接线口，由校准工具读取透明边缘生成。")]
+        public Vector2[] SourcePorts = System.Array.Empty<Vector2>();
+        public Vector2[] TargetPorts = System.Array.Empty<Vector2>();
     }
 
     // 地图生成配置资产。
@@ -74,6 +84,106 @@ namespace RoguelikeMap.Unity
         [SerializeField]
         private List<MapRouteVisual> _routes = new List<MapRouteVisual>();
 
+        [Header("资产连接约束")]
+        [SerializeField] private bool _useAssetConstraints;
+        [SerializeField] private MapRouteProfile _routeProfile;
+        [SerializeField] private List<MapConstraintSpriteBinding> _constraintSprites = new List<MapConstraintSpriteBinding>();
+
+        public bool UseAssetConstraints => _useAssetConstraints;
+        public MapRouteProfile RouteProfile => _routeProfile;
+
+        [Header("离线地图池")]
+        [SerializeField] private bool _usePreGeneratedMaps;
+        [SerializeField] private List<MapPresetPrefab> _preGeneratedMaps = new List<MapPresetPrefab>();
+        public bool UsePreGeneratedMaps => _usePreGeneratedMaps;
+        public IReadOnlyList<MapPresetPrefab> PreGeneratedMaps => _preGeneratedMaps;
+
+        /// <summary>烘焙全部成功后一次绑定，启用后缺失地图也不退回实时生成。</summary>
+        public void ConfigurePreGeneratedMaps(List<MapPresetPrefab> maps)
+        {
+            if (maps == null || maps.Count != 10 || maps.Exists(m => m == null))
+                throw new System.ArgumentException("离线地图池必须包含 10 张完整地图。");
+            _preGeneratedMaps = new List<MapPresetPrefab>(maps);
+            _usePreGeneratedMaps = true;
+        }
+
+        /// <summary>0 随机选择；非零选择器稳定映射到地图编号。每次还原独立对象，不进行铺路。</summary>
+        public MapGenerationResult LoadPreGeneratedMap(uint selector = 0u, uint roomSeed = 0u)
+        {
+            if (_preGeneratedMaps.Count != 10)
+                return new MapGenerationResult(null, false, new[] { "离线地图池需要 10 张地图，不进行实时生成。" });
+            int index = selector == 0u ? Random.Range(0, _preGeneratedMaps.Count) : (int)((selector - 1u) % (uint)_preGeneratedMaps.Count);
+            try
+            {
+                var source = _preGeneratedMaps[index];
+                var preset = source != null ? source.Data : null;
+                int expectedPaths = preset != null && preset.PathCount > 0 ? preset.PathCount : Config.PathCount;
+                int settingsHash = source != null && source.RandomizeRooms ? MapPresetFingerprint.ComputeLayout(Config, _routeProfile, expectedPaths) :
+                    MapPresetFingerprint.Compute(Config, _routeProfile, expectedPaths);
+                if (preset == null || preset.Version != 1 || preset.Graph == null || preset.Graph.AssetLayout == null ||
+                    _routeProfile == null || preset.SettingsHash != settingsHash ||
+                    preset.Graph.AssetLayout.ProfileHash != _routeProfile.ComputeHash() ||
+                    preset.Paths.Count != expectedPaths)
+                    throw new System.InvalidOperationException("地图缺失或配置已变更，请重新烘焙。");
+                if (source.RandomizeRooms)
+                {
+                    uint seed = roomSeed == 0 ? (uint)Random.Range(1, int.MaxValue) : roomSeed;
+                    var assigned = MapRoomDistributor.Assign(preset.Graph, Config, BuildCatalog(), seed);
+                    return new MapGenerationResult(assigned.Graph, assigned.Success, new[] { "读取空白地图 " + (index + 1) + "/10：" + source.name,
+                        "房间分布种子=" + seed, assigned.DiagnosticsText });
+                }
+                return new MapGenerationResult(MapSerializer.FromDto(preset.Graph), true, new[] { "读取离线地图 " + (index + 1) + "/10：" + source.name });
+            }
+            catch (System.Exception error)
+            {
+                return new MapGenerationResult(null, false, new[] { "离线地图读取失败：" + error.Message });
+            }
+        }
+
+        public MapPresetPrefab FindPreGeneratedMapPrefab(MapGraph graph)
+        {
+            foreach (var prefab in _preGeneratedMaps)
+                if (prefab != null && prefab.Matches(graph)) return prefab;
+            return null;
+        }
+
+        /// <summary>一次接收完整烘焙结果，避免 JSON 覆写与序列化缓存混用后丢失像素或模板列表。</summary>
+        public void ConfigureAssetConstraints(MapRouteProfile profile, List<MapConstraintSpriteBinding> sprites)
+        {
+            if (profile == null) throw new System.ArgumentNullException(nameof(profile));
+            if (sprites == null) throw new System.ArgumentNullException(nameof(sprites));
+            _routeProfile = profile;
+            _constraintSprites = new List<MapConstraintSpriteBinding>(sprites);
+            _useAssetConstraints = true;
+            _config.Columns = 5;
+        }
+
+        /// <summary>用稳定占用标识取得原图，显示层不再按空间方向猜测资源。</summary>
+        public Sprite FindConstraintSprite(string id) => _constraintSprites.Find(b => b.FootprintId == id)?.Sprite;
+
+        /// <summary>使用具备足够引入长度的真实端点组，排除贴着图片边缘的长线身。</summary>
+        public Dictionary<string, MapRouteEndCoverage> BuildRouteEndpointCoverage()
+        {
+            var result = new Dictionary<string, MapRouteEndCoverage>();
+            if (_routeProfile == null) return result;
+            foreach (var template in _routeProfile.Templates)
+            {
+                if (!MapRouteSocketSelector.HasUsableEndpoints(template) || result.ContainsKey(template.FootprintId)) continue;
+                result[template.FootprintId] = new MapRouteEndCoverage(
+                    MapRouteSocketSelector.PortBounds(template.Source), MapRouteSocketSelector.PortBounds(template.Target));
+            }
+            return result;
+        }
+
+        /// <summary>可选资产接点管线；关闭时使用逐层铺路、生成时禁止交叉的管线。</summary>
+        public RoguelikeMap.Generation.MapGenerator CreateGenerator() => _useAssetConstraints
+            ? RoguelikeMap.Generation.MapGenerator.CreateAssetConstrained(_routeProfile)
+            : RoguelikeMap.Generation.MapGenerator.CreateLayered(_routeProfile);
+
+        /// <summary>资产约束配置的指纹包含烘焙图片数据，旧地图配置的指纹不变。</summary>
+        public int GenerationHash() => _routeProfile != null
+            ? unchecked(Config.ComputeHash() * 31 + _routeProfile.ComputeHash()) : Config.ComputeHash();
+
         [Header("背景与底纹")]
         [Tooltip("背景插画：铺满整个地图区域，不跟着地图滚动")]
         public Sprite BackgroundSprite;
@@ -83,10 +193,10 @@ namespace RoguelikeMap.Unity
 
         public Color BackgroundTint = Color.white;
 
-        [Tooltip("底纹：跟着地图一起上下滚动的图案，按下面的大小循环平铺")]
+        [Tooltip("底纹：单张拉伸铺满整个地图区域，跟着地图滚动，不重复平铺。")]
         public Sprite BackdropSprite;
 
-        [Tooltip("底纹每一块的大小 = 图片原始尺寸 × 这个系数")]
+        [Tooltip("旧版重复平铺参数，仅保留序列化兼容；当前单张铺满模式不读取。")]
         [Range(0.02f, 1f)]
         public float BackdropTileScale = 0.25f;
 

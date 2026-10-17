@@ -78,11 +78,57 @@ namespace RoguelikeMap.Generation
         public static MapGenerator CreateDefault()
         {
             return new MapGenerator(MapRuleSet.CreateDefault())
-                .AddStep(new Steps.CarvePathsStep())
+                .AddStep(new Steps.CarvePathsStep(false))
                 .AddStep(new Steps.RemoveCrossingsStep())
                 .AddStep(new Steps.PruneDanglingNodesStep())
                 .AddStep(new Steps.AssignNodeTypesStep())
                 .AddStep(new Steps.AttachBossStep())
+                .AddValidator(new ConnectivityValidator())
+                .AddValidator(new RowOccupancyValidator())
+                .AddValidator(new PathCountValidator())
+                .AddValidator(new FixedRowValidator())
+                .AddValidator(new RuleConsistencyValidator());
+        }
+
+        /// <summary>完整路径逐层铺设，生成时排除交叉；沿用房间规则与额外 Boss 层。</summary>
+        public static MapGenerator CreateLayered()
+        {
+            return new MapGenerator(MapRuleSet.CreateDefault())
+                .AddStep(new Steps.CarvePathsStep(true, true))
+                .AddStep(new Steps.AssignNodeTypesStep(true))
+                .AddStep(new Steps.AttachBossStep())
+                .AddValidator(new LayeredTopologyValidator())
+                .AddValidator(new ConnectivityValidator())
+                .AddValidator(new RowOccupancyValidator())
+                .AddValidator(new PathCountValidator())
+                .AddValidator(new FixedRowValidator())
+                .AddValidator(new RuleConsistencyValidator());
+        }
+
+        /// <summary>沿用完整路径生成；原图像素避让参与搜索，位置随地图保存，不由视图重新猜测。</summary>
+        public static MapGenerator CreateLayered(MapRouteProfile profile, int[] columnGuide = null)
+        {
+            if (profile == null) return CreateLayered();
+            return new MapGenerator(MapRuleSet.CreateDefault())
+                .AddStep(new Steps.AssetConstrainedPathsStep(profile, true, columnGuide))
+                .AddStep(new Steps.AssignNodeTypesStep(true))
+                .AddValidator(new Steps.AssetLayoutValidator(profile))
+                .AddValidator(new LayeredTopologyValidator())
+                .AddValidator(new ConnectivityValidator())
+                .AddValidator(new RowOccupancyValidator())
+                .AddValidator(new PathCountValidator())
+                .AddValidator(new FixedRowValidator())
+                .AddValidator(new RuleConsistencyValidator());
+        }
+
+        /// <summary>资产约束管线：拓扑和布局共同生成，首领已包含在内，不再换边、补边或事后删路径。</summary>
+        public static MapGenerator CreateAssetConstrained(MapRouteProfile profile)
+        {
+            if (profile == null) throw new ArgumentNullException(nameof(profile));
+            return new MapGenerator(MapRuleSet.CreateDefault())
+                .AddStep(new Steps.AssetConstrainedPathsStep(profile))
+                .AddStep(new Steps.AssignNodeTypesStep())
+                .AddValidator(new Steps.AssetLayoutValidator(profile))
                 .AddValidator(new ConnectivityValidator())
                 .AddValidator(new RowOccupancyValidator())
                 .AddValidator(new PathCountValidator())
@@ -126,6 +172,7 @@ namespace RoguelikeMap.Generation
                     }
                 };
 
+                string stepFailure = null;
                 for (int i = 0; i < _steps.Count; i++)
                 {
                     try
@@ -134,7 +181,8 @@ namespace RoguelikeMap.Generation
                     }
                     catch (Exception ex)
                     {
-                        context.Log("[步骤异常] " + _steps[i].Name + "：" + ex.Message);
+                        stepFailure = "[步骤异常] " + _steps[i].Name + "：" + ex.Message;
+                        context.Log(stepFailure);
                         break;
                     }
                 }
@@ -143,6 +191,7 @@ namespace RoguelikeMap.Generation
                 context.Graph.Attempt = attempt;
 
                 MapValidationReport report = RunValidators(context);
+                if (stepFailure != null) report.Add(stepFailure);
                 lastGraph = context.Graph;
                 lastReport = report;
 

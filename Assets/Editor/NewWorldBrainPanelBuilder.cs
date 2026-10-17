@@ -34,6 +34,19 @@ namespace SpotlightGameJam.Editor
             var existing = FindPanel(canvas.transform);
             if (existing)
             {
+                if (!existing.GetComponent<CanvasGroup>()) existing.gameObject.AddComponent<CanvasGroup>();
+                existing.Hide(0);
+                var panelFields = new SerializedObject(existing);
+                foreach (var field in new[] { "ordinaryPoolRoot", "ordinaryOrderRoot", "cyberneticPoolRoot", "cyberneticOrderRoot" })
+                {
+                    var property = panelFields.FindProperty(field);
+                    var area = property.objectReferenceValue as RectTransform;
+                    if (!area || !area.GetComponent<GridLayoutGroup>()) continue;
+                    // 默认隐藏的面板不能用不含 inactive 的父级查询，否则会重复包装同一个内容区。
+                    property.objectReferenceValue = area.parent && area.parent.GetComponent<ScrollRect>()
+                        ? NormalizeScrollArea(area) : MakeScrollable(area);
+                }
+                panelFields.ApplyModifiedPropertiesWithoutUndo();
                 var serializedExisting = new SerializedObject(hud);
                 serializedExisting.FindProperty("brainPanel").objectReferenceValue = existing;
                 serializedExisting.ApplyModifiedPropertiesWithoutUndo();
@@ -104,9 +117,42 @@ namespace SpotlightGameJam.Editor
             grid.cellSize = new Vector2(150, 175); grid.spacing = new Vector2(8, 8);
             grid.padding = new RectOffset(8, 8, 8, 8); grid.childAlignment = TextAnchor.UpperLeft;
             grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount; grid.constraintCount = 3;
-            return root;
+            return MakeScrollable(root);
         }
 
+        /// <summary>把旧网格增量升级为裁剪滚动区域，牌堆较大时不会溢出到其他列或按钮上。</summary>
+        private static RectTransform MakeScrollable(RectTransform viewport)
+        {
+            var content = Rect(viewport, "Cards", new Rect(0, 0, viewport.rect.width, 0));
+            content.anchorMin = new Vector2(0, 1); content.anchorMax = new Vector2(1, 1);
+            content.pivot = new Vector2(0.5f, 1); content.anchoredPosition = Vector2.zero; content.sizeDelta = Vector2.zero;
+            var grid = viewport.GetComponent<GridLayoutGroup>();
+            EditorUtility.CopySerialized(grid, content.gameObject.AddComponent<GridLayoutGroup>());
+            UnityEngine.Object.DestroyImmediate(grid);
+            content.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            viewport.gameObject.AddComponent<RectMask2D>();
+            var scroll = viewport.gameObject.AddComponent<ScrollRect>();
+            scroll.viewport = viewport; scroll.content = content; scroll.horizontal = false; scroll.vertical = true;
+            scroll.movementType = ScrollRect.MovementType.Clamped; scroll.scrollSensitivity = 30;
+            return content;
+        }
+
+        /// <summary>收敛旧构建器误生成的嵌套滚动层，保留最外层视口和真实卡牌内容。</summary>
+        private static RectTransform NormalizeScrollArea(RectTransform content)
+        {
+            var parent = content.parent;
+            while (parent && parent.GetComponent<ScrollRect>() && parent.parent && parent.parent.GetComponent<ScrollRect>())
+            {
+                var outer = parent.parent;
+                content.SetParent(outer, false);
+                outer.GetComponent<ScrollRect>().content = content;
+                UnityEngine.Object.DestroyImmediate(parent.gameObject);
+                parent = outer;
+            }
+            return content;
+        }
+
+        /// <summary>创建采用左上角坐标的矩形，不依赖当前 GameView 分辨率。</summary>
         private static RectTransform Rect(Transform parent, string name, Rect bounds)
         {
             var rect = new GameObject(name, typeof(RectTransform)).GetComponent<RectTransform>();
@@ -116,6 +162,7 @@ namespace SpotlightGameJam.Editor
             return rect;
         }
 
+        /// <summary>复用项目中文字体创建说明文字。</summary>
         private static Text TextAt(Transform parent, string name, Rect bounds, int size)
         {
             var text = Rect(parent, name, bounds).gameObject.AddComponent<Text>();
@@ -124,6 +171,7 @@ namespace SpotlightGameJam.Editor
             text.verticalOverflow = VerticalWrapMode.Truncate; return text;
         }
 
+        /// <summary>创建低饱和占位按钮，业务监听由面板生命周期管理。</summary>
         private static Button MakeButton(Transform parent, string name, Rect bounds, string label, int size)
         {
             var rect = Rect(parent, name, bounds);

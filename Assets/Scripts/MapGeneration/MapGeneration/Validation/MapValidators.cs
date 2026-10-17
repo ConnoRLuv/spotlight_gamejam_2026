@@ -5,6 +5,37 @@ using RoguelikeMap.Rules;
 
 namespace RoguelikeMap.Validation
 {
+    /// <summary>复核网格边的方向、跨度与交叉，包含最后挂上的 Boss 连线。</summary>
+    public sealed class LayeredTopologyValidator : IMapValidator
+    {
+        public string Name => "相邻层无交叉";
+        public void Validate(MapGraph graph, MapGenerationContext context, MapValidationReport report)
+        {
+            foreach (var node in graph.Nodes)
+            {
+                if (!node.IsAssigned) report.Add("节点 #" + node.Id + " 未分配房间类型");
+                if (node.Row < 0 || node.Row >= graph.Rows || node.Column < 0 || node.Column >= graph.Columns)
+                    report.Add("节点 #" + node.Id + " 超出地图范围");
+                foreach (int id in node.NextIds)
+                {
+                    var target = graph.Get(id);
+                    if (target == null || target.Row != node.Row + 1 || System.Math.Abs(target.Column - node.Column) > 1)
+                    { report.Add("节点 #" + node.Id + " 存在非法连接"); continue; }
+                    foreach (var right in graph.NodesInRow(node.Row))
+                    {
+                        if (right.Column <= node.Column) continue;
+                        foreach (int rightId in right.NextIds)
+                        {
+                            var other = graph.Get(rightId);
+                            if (other != null && target.Column > other.Column)
+                                report.Add("第 " + node.Row + " 层存在交叉连接");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /// <summary>校验结果。只有 Collect 到 0 条错误才算通过。</summary>
     public sealed class MapValidationReport
     {

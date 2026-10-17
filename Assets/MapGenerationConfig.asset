@@ -17,6 +17,7 @@ MonoBehaviour:
     Columns: 7
     PathCount: 6
     IncludeBossNode: 1
+    ConstrainBossApproach: 0
     BossTypeKey: boss
     HasStartNode: 1
     StartTypeKey: start
@@ -111,31 +112,55 @@ MonoBehaviour:
     Prefab: {fileID: 0}
     SourceEnd: {x: 0.5, y: 0}
     TargetEnd: {x: 0.5, y: 1}
+    SourcePorts: []
+    TargetPorts: []
   - Direction: 1
     Sprite: {fileID: 0}
     Prefab: {fileID: 0}
     SourceEnd: {x: 0.5, y: 0}
     TargetEnd: {x: 0.5, y: 1}
+    SourcePorts: []
+    TargetPorts: []
   - Direction: 2
     Sprite: {fileID: 0}
     Prefab: {fileID: 0}
     SourceEnd: {x: 0.5, y: 0}
     TargetEnd: {x: 0.5, y: 1}
+    SourcePorts: []
+    TargetPorts: []
   - Direction: 3
     Sprite: {fileID: 0}
     Prefab: {fileID: 0}
     SourceEnd: {x: 0.5, y: 0}
     TargetEnd: {x: 0.5, y: 1}
+    SourcePorts: []
+    TargetPorts: []
   - Direction: 4
     Sprite: {fileID: 0}
     Prefab: {fileID: 0}
     SourceEnd: {x: 0.5, y: 0}
     TargetEnd: {x: 0.5, y: 1}
+    SourcePorts: []
+    TargetPorts: []
   - Direction: 5
     Sprite: {fileID: 0}
     Prefab: {fileID: 0}
     SourceEnd: {x: 0.5, y: 0}
     TargetEnd: {x: 0.5, y: 1}
+    SourcePorts: []
+    TargetPorts: []
+  _useAssetConstraints: 0
+  _routeProfile:
+    Version: 1
+    NodeWidth: 130
+    NodeHeight: 130
+    NodeClearanceWidth: 0
+    NodeClearanceHeight: 0
+    ColumnSpacing: 320
+    RowSpacing: 560
+    Footprints: []
+    Templates: []
+  _constraintSprites: []
   BackgroundSprite: {fileID: 0}
   BackgroundPreserveAspect: 1
   BackgroundTint: {r: 1, g: 1, b: 1, a: 1}

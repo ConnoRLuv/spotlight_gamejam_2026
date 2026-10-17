@@ -49,7 +49,8 @@ namespace RoguelikeMap.Unity
 
         private void Awake()
         {
-            _generator = MapGenerator.CreateDefault();
+            if (_configAsset == null || !_configAsset.UsePreGeneratedMaps)
+                _generator = _configAsset != null ? _configAsset.CreateGenerator() : MapGenerator.CreateLayered();
             Catalog = _configAsset != null
                 ? _configAsset.BuildCatalog()
                 : NodeTypeCatalog.CreateDefault();
@@ -57,20 +58,35 @@ namespace RoguelikeMap.Unity
 
         private void Start()
         {
-            if (_generateOnStart) Generate();
+            if (_generateOnStart && Graph == null) Generate();
         }
 
+        /// <summary>采用探索会话保存的同一地图状态，不重算地图、不重置进度；通知现有视图重新绑定。</summary>
+        public void BindRun(MapRunState run)
+        {
+            if (run == null) throw new ArgumentNullException(nameof(run));
+            Graph = run.Graph; RunState = run;
+            if (Catalog == null) Catalog = _configAsset != null ? _configAsset.BuildCatalog() : NodeTypeCatalog.CreateDefault();
+            LastResult = new MapGenerationResult(Graph, true, Array.Empty<string>());
+            Generated?.Invoke(LastResult);
+        }
+
+        /// <summary>按 Inspector 的种子选项生成地图，独立地图演示仍可使用此入口。</summary>
         public MapGenerationResult Generate()
         {
             return Generate(_useFixedSeed ? unchecked((uint)_fixedSeed) : 0u);
         }
 
-        /// <summary>seed 传 0 表示随机。</summary>
+        /// <summary>离线池启用时只选择已有地图，0 随机，1..10 对应地图编号；不执行生成器。</summary>
         public MapGenerationResult Generate(uint seed)
         {
-            LastResult = _generator.Generate(Config, Catalog, seed);
-            Graph = LastResult.Graph;
-            RunState = new MapRunState(Graph);
+            if (_configAsset != null && _configAsset.UsePreGeneratedMaps)
+                LastResult = _configAsset.LoadPreGeneratedMap(seed);
+            else
+            {
+                if (_generator == null) _generator = _configAsset != null ? _configAsset.CreateGenerator() : MapGenerator.CreateLayered();
+                LastResult = _generator.Generate(Config, Catalog, seed);
+            }
 
             if (_logDiagnostics && LastResult.Diagnostics.Count > 0)
                 Debug.Log("[地图生成]\n" + LastResult.DiagnosticsText);
@@ -80,9 +96,12 @@ namespace RoguelikeMap.Unity
 
             if (!LastResult.Success)
             {
-                Debug.LogError("[地图生成] 校验未通过，请检查配置是否自相矛盾。" +
-                               "常见原因是规则互相冲突导致总有节点找不到合法类型。");
+                Debug.LogError("[地图生成] 校验未通过，保留上一次合法地图。种子=" + seed + "\n" + LastResult.DiagnosticsText);
+                return LastResult;
             }
+
+            Graph = LastResult.Graph;
+            RunState = new MapRunState(Graph);
 
             if (Generated != null) Generated(LastResult);
             return LastResult;
@@ -96,24 +115,35 @@ namespace RoguelikeMap.Unity
         {
             if (snapshot == null) return false;
 
-            int currentHash = Config.ComputeHash();
+            int currentHash = _configAsset != null ? _configAsset.GenerationHash() : Config.ComputeHash();
             if (snapshot.ConfigHash != 0 && snapshot.ConfigHash != currentHash)
             {
                 Debug.LogWarning("[地图生成] 存档的地图配置与当前配置不一致，重建出来的地图会不一样。" +
                                  "如果这是一次平衡性改动，请让旧存档作废。");
             }
 
-            MapGenerationResult result = Generate(snapshot.Seed);
+            // 新约束地图直接恢复原有布局与身份，不按新资产重新生成并重置探索进度。
+            if (snapshot.Graph != null)
+            {
+                var restored = MapSerializer.FromDto(snapshot.Graph);
+                var run = new MapRunState(restored);
+                run.RestoreFrom(snapshot.CurrentNodeId, snapshot.VisitedNodeIds);
+                BindRun(run); return true;
+            }
+            // 仅种子快照来自旧算法，必须沿旧管线恢复，不能把旧节点身份套到新资产拓扑。
+            MapGenerationResult result = MapGenerator.CreateDefault().Generate(Config, Catalog, snapshot.Seed);
             if (!result.Success) return false;
 
-            RunState.RestoreFrom(snapshot.CurrentNodeId, snapshot.VisitedNodeIds);
+            var legacyRun = new MapRunState(result.Graph);
+            legacyRun.RestoreFrom(snapshot.CurrentNodeId, snapshot.VisitedNodeIds);
+            BindRun(legacyRun);
             return true;
         }
 
         public MapRunSnapshot CaptureSnapshot()
         {
             if (Graph == null) return null;
-            return MapSerializer.CaptureRun(Graph, RunState, Config.ComputeHash());
+            return MapSerializer.CaptureRun(Graph, RunState, _configAsset != null ? _configAsset.GenerationHash() : Config.ComputeHash());
         }
     }
 }

@@ -24,6 +24,13 @@ namespace RoguelikeMap.Generation.Steps
     /// </summary>
     public sealed class CarvePathsStep : IMapGenerationStep
     {
+        readonly bool _preventCrossings;
+        readonly bool _constrainBossApproach;
+
+        /// <summary>旧种子恢复可关闭预防交叉，保留原随机数消耗与生成结果。</summary>
+        public CarvePathsStep(bool preventCrossings = true, bool constrainBossApproach = false)
+        { _preventCrossings = preventCrossings; _constrainBossApproach = constrainBossApproach; }
+
         public string Name => "铺路径";
 
         public void Execute(MapGenerationContext context)
@@ -32,6 +39,7 @@ namespace RoguelikeMap.Generation.Steps
             int rows = graph.Rows;
             int columns = graph.Columns;
             int pathCount = context.Config.PathCount < 1 ? 1 : context.Config.PathCount;
+            bool constrainBoss = context.Config.IncludeBossNode && (_constrainBossApproach || context.Config.ConstrainBossApproach);
 
             if (context.Config.HasStartNode)
             {
@@ -41,7 +49,7 @@ namespace RoguelikeMap.Generation.Steps
                 graph.StartNodeId = start.Id;
 
                 for (int p = 0; p < pathCount; p++)
-                    CarveOne(graph, context.Random, startColumn, rows, columns);
+                    CarveOne(graph, context.Random, startColumn, rows, columns, constrainBoss);
 
                 context.Log("起点节点 #" + start.Id + "，铺出 " + pathCount + " 条路径，节点数 " + graph.NodeCount);
             }
@@ -49,21 +57,49 @@ namespace RoguelikeMap.Generation.Steps
             {
                 List<int> starts = BuildStartColumns(context, pathCount);
                 for (int p = 0; p < starts.Count; p++)
-                    CarveOne(graph, context.Random, starts[p], rows, columns);
+                    CarveOne(graph, context.Random, starts[p], rows, columns, constrainBoss);
 
                 context.Log("铺出 " + starts.Count + " 条路径，节点数 " + graph.NodeCount);
             }
         }
 
-        /// <summary>从 startColumn 出发，向上随机游走到顶层。</summary>
-        static void CarveOne(MapGraph graph, IRandomSource rng, int startColumn, int rows, int columns)
+        /// <summary>逐层随机游走；可选首领收拢约束确保包括首领在内的连线不跨越两列。</summary>
+        void CarveOne(MapGraph graph, IRandomSource rng, int startColumn, int rows, int columns, bool constrainBossApproach)
         {
             int column = startColumn;
             for (int row = 0; row < rows - 1; row++)
             {
+                if (_preventCrossings)
+                {
+                    var candidates = new List<int>(3);
+                    int center = columns / 2;
+                    int remaining = rows - row - 2;
+                    for (int target = Math.Max(0, column - 1); target <= Math.Min(columns - 1, column + 1); target++)
+                    {
+                        if (constrainBossApproach && Math.Abs(target - center) > remaining + 1) continue;
+                        if (!WouldCross(graph, row, column, target)) candidates.Add(target);
+                    }
+                    if (candidates.Count == 0) throw new InvalidOperationException("没有合法的下一层连接。");
+                    int targetColumn = candidates[rng.Range(0, candidates.Count)];
+                    var source = graph.GetOrCreate(row, column);
+                    var targetNode = graph.GetOrCreate(row + 1, targetColumn);
+                    graph.AddEdge(source.Id, targetNode.Id);
+                    column = targetColumn;
+                    continue;
+                }
                 int next = column + rng.Range(-1, 2);
                 if (next < 0) next = 0;
                 if (next > columns - 1) next = columns - 1;
+
+                if (constrainBossApproach)
+                {
+                    // 每剩一层可多离中心一列，逐层缩小可达范围，不能在最后一步突然跨列。
+                    int remaining = rows - row - 2;
+                    int center = columns / 2;
+                    int min = Math.Max(0, center - 1 - remaining);
+                    int max = Math.Min(columns - 1, center + 1 + remaining);
+                    next = Math.Max(min, Math.Min(max, next));
+                }
 
                 MapNode from = graph.GetOrCreate(row, column);
                 MapNode to = graph.GetOrCreate(row + 1, next);
@@ -71,6 +107,21 @@ namespace RoguelikeMap.Generation.Steps
 
                 column = next;
             }
+        }
+
+        static bool WouldCross(MapGraph graph, int row, int column, int targetColumn)
+        {
+            foreach (var other in graph.NodesInRow(row))
+            {
+                if (other.Column == column) continue;
+                foreach (int id in other.NextIds)
+                {
+                    int otherTarget = graph.Get(id).Column;
+                    if (other.Column < column && otherTarget > targetColumn ||
+                        other.Column > column && otherTarget < targetColumn) return true;
+                }
+            }
+            return false;
         }
 
         static List<int> BuildStartColumns(MapGenerationContext context, int pathCount)

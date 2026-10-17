@@ -21,6 +21,9 @@ namespace RoguelikeMap.Generation.Steps
     /// </summary>
     public sealed class AssignNodeTypesStep : IMapGenerationStep
     {
+        readonly bool _strictFallback;
+        public AssignNodeTypesStep(bool strictFallback = false) { _strictFallback = strictFallback; }
+
         /// <summary>单个节点最多重掷几次，超过就降级。太小会让精英/商店缺失，太大浪费算力。</summary>
         public int MaxRerollsPerNode = 16;
 
@@ -108,14 +111,23 @@ namespace RoguelikeMap.Generation.Steps
         }
 
         /// <summary>规则全拒绝时的降级路径：按 FallbackOrder 找一个能过的，再不行退回任一合法类型。</summary>
-        static string PickFallback(MapGenerationContext context, MapNode node)
+        string PickFallback(MapGenerationContext context, MapNode node)
         {
             List<string> order = context.Config.FallbackOrder;
             for (int i = 0; i < order.Count; i++)
             {
                 string key = order[i];
                 if (!context.Catalog.Contains(key)) continue;
+                if (_strictFallback && !HasPositiveWeight(context, node, key)) continue;
                 if (context.Rules.Evaluate(node, key, context).Allowed) return key;
+            }
+
+            if (_strictFallback)
+            {
+                foreach (var entry in context.Config.Weights)
+                    if (entry.Evaluate(node.Row) > 0f && context.Catalog.Contains(entry.TypeKey)
+                        && context.Rules.Evaluate(node, entry.TypeKey, context).Allowed) return entry.TypeKey;
+                throw new System.InvalidOperationException("节点 #" + node.Id + " 没有符合权重和规则的房间类型。");
             }
 
             List<NodeTypeDefinition> all = context.Catalog.AllSorted();
@@ -127,6 +139,13 @@ namespace RoguelikeMap.Generation.Steps
                 return key;
             }
             return NodeTypeKeys.Monster;
+        }
+
+        static bool HasPositiveWeight(MapGenerationContext context, MapNode node, string key)
+        {
+            foreach (var entry in context.Config.Weights)
+                if (entry.TypeKey == key && entry.Evaluate(node.Row) > 0f) return true;
+            return false;
         }
     }
 }

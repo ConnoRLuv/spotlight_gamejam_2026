@@ -1,5 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
+using RoguelikeMap.Generation;
+using RoguelikeMap.Model;
 
 namespace RoguelikeMap.Unity
 {
@@ -26,7 +28,10 @@ namespace RoguelikeMap.Unity
         NativeFit = 1,
 
         // 只用一张图，拉伸 + 旋转成一条直线段。美术只给了一张线的时候用。
-        SimpleStretch = 2
+        SimpleStretch = 2,
+
+        /// <summary>原图保持像素尺寸、比例与朝向，只平移；节点布局应让线头直接进入节点范围。</summary>
+        NativeSize = 3
     }
 
     // 一条路线的表现。挂在路线预制体上。
@@ -36,6 +41,7 @@ namespace RoguelikeMap.Unity
     // 于是移动 / 旋转 / 缩放都绕着起点发生，端点不会漂。
     // 终点则用 _targetEnd 描述（图片里的归一化坐标，y 轴向上，0 = 图片下边）。
     // MapArtPrefabBuilder 生成预制体时会按图片的透明边自动把这两个值算好。
+    /// <summary>摆放路线美术并显示状态；原尺寸模式每条边只使用一张完整图片，不生成补线。</summary>
     public sealed class MapEdgeView : MonoBehaviour
     {
         [SerializeField] private Image _image;
@@ -52,6 +58,9 @@ namespace RoguelikeMap.Unity
         public MapRouteDirection Direction { get; private set; }
         public Image Image => _image;
         public Vector2 TargetEnd => _targetEnd;
+        public MapRouteTemplate SocketTemplate { get; private set; }
+        public RouteFitBounds SourcePortBounds { get; private set; }
+        public RouteFitBounds TargetPortBounds { get; private set; }
 
         Color _baseColor = Color.white;
         bool _available;
@@ -96,11 +105,79 @@ namespace RoguelikeMap.Unity
             _trim = Mathf.Clamp(trim, 0f, 0.4f);
         }
 
+        /// <summary>保持原朝向和宽高比；所有真实线头均落在对应节点的覆盖区域内。</summary>
+        public bool PlaceProportional(Vector2 from, Vector2 to, MapRouteVisual route, Vector2 sourceSize, Vector2 targetSize)
+        {
+            CacheComponents();
+            var rect = transform as RectTransform;
+            var sprite = _image != null ? _image.sprite : null;
+            if (rect == null || sprite == null || route == null) return false;
+            var size = sprite.rect.size;
+            var sourcePorts = PortBounds(route.SourcePorts, route.SourceEnd, size);
+            var targetPorts = PortBounds(route.TargetPorts, route.TargetEnd, size);
+            Vector2 chord = Vector2.Scale(route.TargetEnd - route.SourceEnd, size);
+            if (chord.sqrMagnitude < 0.0001f) return false;
+            // 优先保持原图大小，仅在接点范围要求时做统一缩放。
+            double preferred = 1;
+            if (!MapProportionalRouteFit.TryFit(sourcePorts, targetPorts,
+                NodeBounds(from, sourceSize), NodeBounds(to, targetSize), preferred,
+                out double scale, out double x, out double y)) return false;
+
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = Vector2.zero;
+            rect.sizeDelta = size;
+            rect.localScale = new Vector3((float)scale, (float)scale, 1);
+            rect.localRotation = Quaternion.identity;
+            rect.anchoredPosition = new Vector2((float)x, (float)y);
+            return true;
+        }
+
+        public void PlaceSocketTemplate(MapRouteSocketFit fit)
+        {
+            CacheComponents();
+            var rect = (RectTransform)transform;
+            SocketTemplate = fit.Template;
+            SourcePortBounds = fit.SourcePorts;
+            TargetPortBounds = fit.TargetPorts;
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = Vector2.zero;
+            rect.sizeDelta = _image.sprite.rect.size;
+            rect.localScale = new Vector3((float)fit.Scale, (float)fit.Scale, 1);
+            rect.localRotation = Quaternion.identity;
+            rect.anchoredPosition = new Vector2((float)fit.X, (float)fit.Y);
+        }
+
+        static RouteFitBounds PortBounds(Vector2[] ports, Vector2 fallback, Vector2 size)
+        {
+            Vector2 min = fallback, max = fallback;
+            if (ports != null && ports.Length > 0)
+            {
+                min = max = ports[0];
+                for (int i = 1; i < ports.Length; i++)
+                { min = Vector2.Min(min, ports[i]); max = Vector2.Max(max, ports[i]); }
+            }
+            return new RouteFitBounds(min.x * size.x, min.y * size.y, max.x * size.x, max.y * size.y);
+        }
+
+        static RouteFitBounds NodeBounds(Vector2 center, Vector2 size)
+        {
+            // 留出内侧余量，避免线头刚好停在图标外框边缘。
+            var half = Vector2.Max(size * 0.5f - new Vector2(2, 2), Vector2.one);
+            return new RouteFitBounds(center.x - half.x, center.y - half.y, center.x + half.x, center.y + half.y);
+        }
+
         // 把这条线摆到 from → to 之间。from 是父节点位置，to 是子节点位置，都相对于连线容器的中心。
         public void Place(Vector2 from, Vector2 to, MapRouteLayout layout, float thickness)
         {
             var rect = transform as RectTransform;
             if (rect == null) return;
+
+            var nativeSprite = _image != null ? _image.sprite : null;
+            if (layout == MapRouteLayout.NativeSize && nativeSprite != null)
+            {
+                PlaceAtNativeSize(rect, nativeSprite, from, to);
+                return;
+            }
 
             Vector2 delta = to - from;
             float length = delta.magnitude;
@@ -158,6 +235,44 @@ namespace RoguelikeMap.Unity
             rect.sizeDelta = size;
             rect.localRotation = Quaternion.Euler(0f, 0f, angle);
             rect.anchoredPosition = from;   // pivot 就在起点上，所以直接对齐 from
+        }
+
+        /// <summary>固定美术原尺寸并居中放在两节点之间；不使用长度缩放或裁剪修改图片。</summary>
+        private void PlaceAtNativeSize(RectTransform rect, Sprite sprite, Vector2 from, Vector2 to)
+        {
+            rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = sprite.rect.size;
+            rect.localScale = Vector3.one;
+            rect.localRotation = Quaternion.identity;
+            var chord = Vector2.Scale(_targetEnd - rect.pivot, sprite.rect.size);
+            var source = (from + to - chord) * 0.5f;
+            rect.anchoredPosition = source;
+            // 两端直接藏入节点图标下方；间距由地图布局匹配原图，不拼接、不拉伸。
+        }
+
+        /// <summary>显示生成器已验证的单图平移；不能重新猜测端点、旋转或缩放原图。</summary>
+        public void PlaceBaked(int x, int y, MapRouteTemplate template = null)
+        {
+            CacheComponents();
+            BindBakedTemplate(template);
+            var rect = transform as RectTransform;
+            if (rect == null || _image == null || _image.sprite == null) return;
+            rect.anchorMin = rect.anchorMax = new Vector2(.5f, .5f);
+            rect.pivot = Vector2.zero; rect.sizeDelta = _image.sprite.rect.size;
+            rect.anchoredPosition = new Vector2(x, y); rect.localScale = Vector3.one; rect.localRotation = Quaternion.identity;
+        }
+
+        /// <summary>预制体实例只恢复接点元数据和着色，不重新计算或修改已摆好的位置。</summary>
+        public void BindBakedTemplate(MapRouteTemplate template, Color? color = null)
+        {
+            CacheComponents();
+            SocketTemplate = template;
+            if (template != null)
+            {
+                SourcePortBounds = MapRouteSocketSelector.PortBounds(template.Source);
+                TargetPortBounds = MapRouteSocketSelector.PortBounds(template.Target);
+            }
+            if (color.HasValue) { _baseColor = color.Value; ApplyColor(); }
         }
 
         private void PlaceAsStretch(

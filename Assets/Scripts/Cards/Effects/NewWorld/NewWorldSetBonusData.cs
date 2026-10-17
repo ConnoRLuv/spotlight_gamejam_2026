@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace SpotlightGameJam
 {
-    /// <summary>套装触发时机：目前只支持“每打出一张牌”，后续新时机在此追加。</summary>
+    /// <summary>套装激活后的被动结算时机；四部位激活条件统一由 RunBuffState 管理。</summary>
     public enum NewWorldSetTrigger { OnAnyCardPlayed }
     /// <summary>套装全局效果种类：后续新增效果在此追加并同步扩展结算入口。</summary>
     public enum NewWorldSetEffect { ReturnBasicFromDiscard }
@@ -13,11 +13,10 @@ namespace SpotlightGameJam
     public enum NewWorldSetReturnPolicy { MostRecent, Random }
 
     /// <summary>
-    /// 新世界系列套装配置：穿戴一整套同系列义体后持续生效的全局被动效果。
+    /// 新世界套装配置：同一玩家回合成功打出指定四部位后，持续到本场战斗结束。
     /// </summary>
     /// <remarks>
-    /// 按“拥有/穿戴”判定：四个部位都装备了 requiredParts 指定的义体即视为穿戴齐全，
-    /// 随后每次出牌触发一次全局效果。判定不依赖耐久，报废部件仍视为已穿戴。
+    /// 保留原序列化字段与资产身份；实际组合记录统一由 RunBuffState 管理。
     /// </remarks>
     [CreateAssetMenu(menuName = "Spotlight/新世界/套装效果配置")]
     public sealed class NewWorldSetBonusData : ScriptableObject
@@ -25,13 +24,13 @@ namespace SpotlightGameJam
         public string setId;
         public string setName;
         [TextArea] public string description;
-        [Tooltip("穿戴齐全所需部件；必须覆盖脑机、躯干、手部、腿部四个部位。")]
+        [Tooltip("同回合需成功打出的部件；必须覆盖脑机、躯干、手部、腿部四个部位。")]
         public CyberneticData[] requiredParts = Array.Empty<CyberneticData>();
         public NewWorldSetTrigger trigger = NewWorldSetTrigger.OnAnyCardPlayed;
         public NewWorldSetEffect effect = NewWorldSetEffect.ReturnBasicFromDiscard;
         public NewWorldSetReturnPolicy returnPolicy = NewWorldSetReturnPolicy.MostRecent;
 
-        /// <summary>拒绝空系列、缺部位、跨系列混搭及无效义体，保证套装不会被误触发。</summary>
+        /// <summary>拒绝空身份、缺部位、重复身份及无效义体；同部位允许配置多个候选。</summary>
         public IReadOnlyList<string> Validate()
         {
             var errors = new List<string>();
@@ -40,22 +39,20 @@ namespace SpotlightGameJam
             if (!Enum.IsDefined(typeof(NewWorldSetTrigger), trigger)) errors.Add("未知触发时机。");
             if (!Enum.IsDefined(typeof(NewWorldSetEffect), effect)) errors.Add("未知套装效果。");
             if (!Enum.IsDefined(typeof(NewWorldSetReturnPolicy), returnPolicy)) errors.Add("未知回收策略。");
-            if (requiredParts == null || requiredParts.Length != 4)
-            { errors.Add("套装必须恰好配置四个部位。"); return errors; }
+            if (requiredParts == null || requiredParts.Length < 4)
+            { errors.Add("套装必须配置完整四个部位。"); return errors; }
             if (requiredParts.Any(part => !part))
             { errors.Add("套装部件含空引用。"); return errors; }
             if (requiredParts.Select(part => part.slot).Distinct().Count() != 4)
                 errors.Add("套装必须覆盖脑机、躯干、手部、腿部四个部位。");
-            if (requiredParts.Select(part => part.cyberneticId).Distinct().Count() != 4)
+            if (requiredParts.Select(part => part.cyberneticId).Distinct().Count() != requiredParts.Length)
                 errors.Add("套装部件身份重复。");
             foreach (var part in requiredParts) errors.AddRange(part.Validate());
             return errors;
         }
 
-        /// <summary>判断四个部位是否都装备了本套部件；按义体 ID 判重，不要求部件耐久大于零。</summary>
+        /// <summary>仅预告持有牌组是否覆盖组合；实际激活由成功出牌记录决定，不使用部位首张查询。</summary>
         public bool IsComplete(CyberneticLoadout loadout) =>
-            loadout != null && requiredParts != null && requiredParts.Length == 4 &&
-            requiredParts.All(part => part && loadout.Get(part.slot) != null &&
-                loadout.Get(part.slot).Data.cyberneticId == part.cyberneticId);
+            loadout != null && RunBuffData.MatchesParts(requiredParts, loadout.Owned.Select(card => card.Data));
     }
 }

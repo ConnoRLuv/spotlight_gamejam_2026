@@ -8,10 +8,8 @@ namespace SpotlightGameJam
     /// 跳过敌人阶段；复用 BattleTurnEffects.ExtraTurns，避免额外引入第二套回合计数器。
     /// </remarks>
     [CreateAssetMenu(menuName = "Spotlight/卡牌效果/新世界·额外行动回合")]
-    public sealed class NewWorldLegsEffectData : CardEffectData
+    public sealed class NewWorldLegsEffectData : ExtraTurnEffectData
     {
-        /// <summary>登记一个额外玩家回合，结束回合时由 TurnController 消费。</summary>
-        public override void Execute(BattleContext context, CardInstance card, CombatantState target) =>
-            context.TurnEffects.ExtraTurns = checked(context.TurnEffects.ExtraTurns + 1);
+        // 保留脚本身份以兼容已有资产，结算直接继承通用额外回合模板。
     }
 }

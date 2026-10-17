@@ -5,45 +5,33 @@ using System.Linq;
 namespace SpotlightGameJam
 {
     /// <summary>
-    /// 新世界套装的运行时状态：按穿戴齐全与否维护生效集合，并在每次成功出牌后应用全局效果。
+    /// 新世界套装的兼容展示与被动结算入口；组合激活、回合记录和清理均由 RunBuffState 负责。
     /// </summary>
     /// <remarks>
-    /// 每个探索创建一个实例（保存在 RunState），每场战斗通过 BattleContext 构造/释放完成
-    /// 对 CardPlayed 事件的订阅；装备可能随战斗变化，因此每次出牌前按当前装备重算生效集合。
+    /// 保留成员已有的 SetBonuses 配置接口；这里只监听成功出牌，不保存第二份装备或激活状态。
     /// </remarks>
     public sealed class NewWorldSetBonusState
     {
-        private readonly CyberneticLoadout loadout;
-        private NewWorldSetBonusData[] definitions = Array.Empty<NewWorldSetBonusData>();
-        private readonly List<NewWorldSetBonusData> active = new List<NewWorldSetBonusData>();
+        private readonly RunBuffState buffs;
         private BattleContext context;
-        private bool attached;
-        public IReadOnlyList<NewWorldSetBonusData> Active => active.ToArray();
-        public event Action Changed;
+        public IReadOnlyList<NewWorldSetBonusData> Active => buffs.ActiveSets;
+        public event Action Changed { add { buffs.Changed += value; } remove { buffs.Changed -= value; } }
 
-        /// <summary>保存装备归属查询入口；耐久、抽弃牌和维修不会触发套装以外的操作。</summary>
-        public NewWorldSetBonusState(CyberneticLoadout loadout)
-        { this.loadout = loadout ?? throw new ArgumentNullException(nameof(loadout)); }
+        /// <summary>引用探索中的唯一组合状态，避免独立维护出牌记录和持续时间。</summary>
+        public NewWorldSetBonusState(RunBuffState buffs)
+        { this.buffs = buffs ?? throw new ArgumentNullException(nameof(buffs)); }
 
-        /// <summary>配置可生效套装并清空旧集合；携带完整四部位不会自动触发，仍需装备与出牌。</summary>
+        /// <summary>保留旧配置接口，注册到统一组合状态；携带全套不会自动激活。</summary>
         public void Configure(IEnumerable<NewWorldSetBonusData> bonuses)
-        {
-            var candidates = bonuses?.Where(value => value).Distinct().ToArray() ?? Array.Empty<NewWorldSetBonusData>();
-            foreach (var bonus in candidates)
-                if (bonus.Validate().Count > 0) throw new ArgumentException("新世界套装配置无效。");
-            definitions = candidates;
-            Recompute();
-        }
+            => buffs.ConfigureSets(bonuses);
 
-        /// <summary>绑定当前战斗的“成功出牌”事件，并立即按装备重算。</summary>
+        /// <summary>绑定当前战斗的成功出牌事件，不因绑定或携带牌组激活套装。</summary>
         public void Attach(BattleContext battle)
         {
             if (battle == null) throw new ArgumentNullException(nameof(battle));
             Detach();
             context = battle;
             context.CardPlayed += OnCardPlayed;
-            attached = true;
-            Recompute();
         }
 
         /// <summary>解除对指定或当前战斗的订阅；战斗释放时调用，避免旧战斗继续触发回收。</summary>
@@ -51,27 +39,17 @@ namespace SpotlightGameJam
         {
             if (battle != null && context != battle) return;
             if (context != null) context.CardPlayed -= OnCardPlayed;
-            context = null; attached = false;
-        }
-
-        /// <summary>按穿戴齐全与否刷新生效集合；集合不变时不发通知，避免每次出牌重复刷新。</summary>
-        private void Recompute()
-        {
-            var next = definitions.Where(bonus => bonus.IsComplete(loadout)).ToArray();
-            if (active.SequenceEqual(next)) return;
-            active.Clear(); active.AddRange(next);
-            Changed?.Invoke();
+            context = null;
         }
 
         /// <summary>战斗仍未结束时，把每张成功打出的牌分发给当前生效的套装。</summary>
         private void OnCardPlayed(CardInstance card)
         {
             if (context == null || context.IsFinished) return;
-            Recompute();
-            if (active.Count == 0) return;
-            foreach (var bonus in active) Apply(bonus, context);
+            foreach (var bonus in Active) Apply(bonus, context);
         }
 
+        /// <summary>把已激活套装的配置分发给被动结算，不重新判断组合或装备。</summary>
         private void Apply(NewWorldSetBonusData bonus, BattleContext battle)
         {
             if (bonus.trigger != NewWorldSetTrigger.OnAnyCardPlayed) return;

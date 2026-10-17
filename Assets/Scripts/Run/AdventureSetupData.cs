@@ -4,7 +4,7 @@ using System.Linq;
 using UnityEngine;
 namespace SpotlightGameJam
 {
-    /// <summary>探索入口共享配置：普通牌、义体及两套独立的组合效果。</summary>
+    /// <summary>探索入口共享配置：普通牌、义体和统一触发的组合效果，兼容新世界旧配置入口。</summary>
     [CreateAssetMenu(menuName = "Spotlight/探索/出发配置")]
     public sealed class AdventureSetupData : ScriptableObject
     {

@@ -4,7 +4,7 @@ using NUnit.Framework;
 
 namespace SpotlightGameJam.Tests
 {
-    /// <summary>验证新世界（Type-00）四部件效果、牌堆重排与穿戴全套的套装回收规则。</summary>
+    /// <summary>验证新世界四部件效果、牌堆重排与同回合成功四部位的套装回收规则。</summary>
     public sealed class NewWorldRulesTests
     {
         private TestAssets assets;
@@ -24,6 +24,7 @@ namespace SpotlightGameJam.Tests
             return data;
         }
 
+        /// <summary>创建完整的新世界被动配置，触发记录由 RunBuffState 统一管理。</summary>
         private NewWorldSetBonusData MakeBonus(CyberneticData[] parts)
         {
             var bonus = assets.Create<NewWorldSetBonusData>();
@@ -114,7 +115,7 @@ namespace SpotlightGameJam.Tests
             Assert.That(context.Cybernetic.GetDrawPileOrder(), Is.EqualTo(new[] { cyberInstance }));
         }
 
-        /// <summary>套装：穿戴全套后每打出一张牌，把最近弃置的一张基本牌回收入手。</summary>
+        /// <summary>套装：同回合成功四部位后，每次出牌把最近弃置的一张基本牌回收入手。</summary>
         [Test]
         public void SetBonusRecyclesMostRecentBasicFromDiscardOnEveryCardPlay()
         {
@@ -131,6 +132,12 @@ namespace SpotlightGameJam.Tests
             context.Run.SetBonuses.Configure(new[] { MakeBonus(parts) });
             TestAssets.Prepare(context);
 
+            context.Run.Buffs.BeginTurn();
+            var service = new CardPlayService();
+            foreach (var card in context.Run.Loadout.GetUsableCards()) context.Cybernetic.Hand.TryAdd(card);
+            foreach (var card in context.Cybernetic.Hand.Cards.ToArray())
+                Assert.That(service.TryPlay(context, card).Success, Is.True);
+
             var discarded = context.Ordinary.Hand.Cards[0];
             context.Ordinary.Discard(discarded);
             var played = context.Ordinary.Hand.Cards[0];
@@ -143,7 +150,7 @@ namespace SpotlightGameJam.Tests
             Assert.That(context.Ordinary.DiscardPile.Contains(discarded), Is.True);
         }
 
-        /// <summary>套装完成度：四部位齐全才算穿戴完整，缺少任一部位不触发。</summary>
+        /// <summary>牌组预告只判断候选覆盖，不用于实际激活套装。</summary>
         [Test]
         public void SetBonusRequiresAllFourPartsOfTheSameSet()
         {
