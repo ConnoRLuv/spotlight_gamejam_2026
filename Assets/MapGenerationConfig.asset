@@ -161,6 +161,8 @@ MonoBehaviour:
     Footprints: []
     Templates: []
   _constraintSprites: []
+  _usePreGeneratedMaps: 0
+  _preGeneratedMaps: []
   BackgroundSprite: {fileID: 0}
   BackgroundPreserveAspect: 1
   BackgroundTint: {r: 1, g: 1, b: 1, a: 1}
