@@ -16,6 +16,7 @@ MonoBehaviour:
   factionId: tian-qiong-legion
   slot: 2
   maxDurability: 3
+  shopPricing: {fileID: 11400000, guid: ae810f002c2dc7944bec59a77e0fc1f2, type: 2}
   cards:
   - {fileID: 11400000, guid: 82b0164e077d7774685c88cc3eee96f6, type: 2}
   - {fileID: 11400000, guid: 82b0164e077d7774685c88cc3eee96f6, type: 2}

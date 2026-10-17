@@ -116,6 +116,8 @@ namespace SpotlightGameJam.UI
         {
             Unbind(); battle = value; pendingCard = null; choicePanel.SetActive(false);
             battle.Context.Changed += OnBattleChanged;
+            battle.Context.Run.GoldChanged += OnGoldChanged;
+            battle.Context.Player.Changed += OnPlayerHealthChanged;
             if (discardPanel) discardPanel.Bind(battle.Context);
 
             if (drawPilePanel) drawPilePanel.Bind(battle.Context);
@@ -124,7 +126,12 @@ namespace SpotlightGameJam.UI
         /// <summary>解除战斗事件订阅并清空关联展示，避免引用上一场战斗。</summary>
         private void Unbind()
         {
-            if (battle != null) battle.Context.Changed -= OnBattleChanged;
+            if (battle != null)
+            {
+                battle.Context.Changed -= OnBattleChanged;
+                battle.Context.Run.GoldChanged -= OnGoldChanged;
+                battle.Context.Player.Changed -= OnPlayerHealthChanged;
+            }
             if (discardPanel) discardPanel.Bind(null);
 
             if (brainPanel) brainPanel.Close(0);
@@ -139,6 +146,20 @@ namespace SpotlightGameJam.UI
                 CancelSelection();
             Refresh();
         }
+
+        /// <summary>地图或商店改变塞勒币时即时更新顶部余额，无需推进战斗或重新绑定。</summary>
+        private void OnGoldChanged(int amount) { if (scene && scene.goldText) scene.goldText.text = "塞勒币 " + amount; }
+
+        /// <summary>商店恢复生命时即时同步露出的工具栏和血条，不重建手牌或执行回合逻辑。</summary>
+        private void OnPlayerHealthChanged(CombatantState player)
+        {
+            if (!scene) return;
+            if (scene.healthText) scene.healthText.text = "生命 " + player.Health;
+            if (scene.playerHealthText) scene.playerHealthText.text = player.Health + "/" + player.MaxHealth + "  护盾 " + player.Shield;
+        }
+
+        /// <summary>外部只读界面关闭后同步当前卡面和义体耐久，不执行战斗指令。</summary>
+        public void RefreshDisplay() { if (battle != null) Refresh(); }
 
         /// <summary>切换到普通手牌页并刷新卡牌展示。</summary>
         public void ShowOrdinary() { cybernetic = false; Refresh(); }

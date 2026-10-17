@@ -15,7 +15,11 @@ namespace SpotlightGameJam
         [Tooltip("义体所属阵营，用于同阵营改造候选筛选。")]
         public string factionId = "tian-qiong-legion";
         public CyberneticSlot slot;
+        [Tooltip("义体部件图标，用于商店维修展示；与完整卡面美术分别配置。")]
+        public Sprite icon;
         [Min(1)] public int maxDurability = 3;
+        [Tooltip("商店系列定价；未配置时禁止购买和修复，不影响战斗规则。")]
+        public CyberneticShopPriceData shopPricing;
         // 可重复引用同一配置以表示多张牌；理智费用统一定义在各 CardData 中。
         public CardData[] cards = new CardData[0];
         /// <summary>

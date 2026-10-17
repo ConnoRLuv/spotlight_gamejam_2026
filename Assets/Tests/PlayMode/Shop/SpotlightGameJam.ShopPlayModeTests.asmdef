@@ -1,0 +1,6 @@
+{
+    "name": "SpotlightGameJam.ShopPlayModeTests",
+    "references": ["SpotlightGameJam.Runtime", "SpotlightGameJam.UI", "UnityEngine.UI"],
+    "optionalUnityReferences": ["TestAssemblies"],
+    "autoReferenced": false
+}
