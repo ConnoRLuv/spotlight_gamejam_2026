@@ -61,6 +61,8 @@ namespace SpotlightGameJam.Tests
             for (int i = 0; i < 3; i++)
             {
                 Click(hud.GetComponentsInChildren<Button>(true).Single(button => button.name == "TestShopButton"));
+                Assert.That(entry.transform.GetSiblingIndex(), Is.GreaterThan(hud.transform.Find("BattleLayout_16x9").GetSiblingIndex()),
+                    "商店流程父节点必须显示在战斗界面之上，不能只调整父节点内部的遮罩顺序。");
                 Assert.That(entry.IsOpen && dialogue.IsVisible, Is.True);
                 Assert.That(shop.IsVisible, Is.False);
                 Assert.That(inputGroup.interactable, Is.False);
@@ -160,6 +162,8 @@ namespace SpotlightGameJam.Tests
             run.AddGold(1300);
             var zones = context.Cybernetic.DrawPile.Cards.Concat(context.Cybernetic.Hand.Cards).Concat(context.Cybernetic.DiscardPile.Cards).Select(card => card.Id).ToArray();
             entry.Open(); dialogue.Advance(); dialogue.Advance();
+            // 真实鼠标射线只在淡入完成、Canvas 已生成图形后验证；立即调用按钮不能覆盖这个时序。
+            yield return new WaitForSecondsRealtime(0.2f);
             var buy = shop.transform.Find("Layout_16x9/ProductSlot_0/BuyButton").GetComponent<Button>();
             Click(buy);
             Assert.That(run.Gold, Is.EqualTo(300));
@@ -168,6 +172,15 @@ namespace SpotlightGameJam.Tests
             Assert.That(buy.IsInteractable(), Is.False);
             var slot = shop.transform.Find("Layout_16x9/RepairSlot_脑机");
             var repair = slot.Find("RepairButton").GetComponent<Button>();
+            Canvas.ForceUpdateCanvases();
+            var pointer = new PointerEventData(EventSystem.current)
+            {
+                position = RectTransformUtility.WorldToScreenPoint(Camera.main, repair.transform.position)
+            };
+            var hits = new System.Collections.Generic.List<RaycastResult>();
+            EventSystem.current.RaycastAll(pointer, hits);
+            Assert.That(hits.Count, Is.GreaterThan(0));
+            Assert.That(hits[0].gameObject, Is.EqualTo(repair.gameObject), "维修框必须能实际接收点击，不能被装饰文字或战斗画面盖住。");
             Click(repair);
             Assert.That(run.Gold, Is.EqualTo(150));
             Assert.That(run.Loadout.Owned.Where(card => card.Data == original).Select(card => card.Durability), Is.All.EqualTo(original.maxDurability - 1));
@@ -265,7 +278,8 @@ namespace SpotlightGameJam.Tests
                 toolbar.GetWorldCorners(toolbarCorners); modal.GetWorldCorners(modalCorners);
                 float toolbarBottom = toolbarCorners.Min(corner => entry.transform.InverseTransformPoint(corner).y);
                 float modalTop = modalCorners.Max(corner => entry.transform.InverseTransformPoint(corner).y);
-                Assert.That(modalTop, Is.LessThanOrEqualTo(toolbarBottom + 0.1f), "面板遮挡顶部 toolbar " + size);
+                // 覆盖顶栏下沿的透明留边，保证背景不漏光，同时保留顶栏主体。
+                Assert.That(modalTop, Is.EqualTo(toolbarBottom + 12f).Within(0.1f), "面板未衔接顶部 toolbar 的透明留边 " + size);
                 var frame = (RectTransform)panel.transform.Find("Layout_16x9");
                 foreach (var text in frame.GetComponentsInChildren<Text>())
                 {

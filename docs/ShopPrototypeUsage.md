@@ -1,5 +1,15 @@
 # 商人对话与商店
 
+## 主分支商店美术
+
+`ShopPanel.prefab` 已接入 `Shop_Popup.prefab` 使用的商店背景、治疗按钮及关闭按钮，继续沿用原预制体的 `ShopPanel`、`BasePanel` 和交易引用。`Shop_Popup` 本身保留为美术资源模板，不负责扣费，也没有重复添加一套商店逻辑。
+
+左侧四个白框依次为脑机、躯干、手部、腿部。显示当前探索真实型号与共享耐久；有卡图时显示卡图，暂无卡图时显示部位文字。点击整个义体框修复一点耐久，框下显示费用；同部位多个型号仍可点“切换”。未持有的部位不显示旧名称、图像或耐久。
+
+右侧六个商品位置保留原有卡面、价格、购买状态和结算；商人立绘位于右侧，商品避开立绘区域。治疗原图中的“治疗”文字保留，右侧独立显示恢复量、费用和生命。窗口按背景原始比例等比适配，顶部 toolbar 继续露出；打开流程时将整个流程父节点提升到战斗上方，退出后恢复战斗操作。
+
+如需再次同步样式，可执行 **Spotlight → Shop → Apply Main Artwork To Existing Shop**。该工具增量修改现有控件，不改原始 PNG、`Shop_Popup` 或构建场景顺序；保留源 `ShopPanel` 的编辑预览激活状态与布局锚点。实际场景入口仍负责初始隐藏。
+
 ## BattleScene 测试
 
 打开 `Assets/Scenes/BattleScene.unity` 并进入 Play Mode，点击画面上方的 **测试商店**。
@@ -53,7 +63,7 @@ dialoguePanel.Play(sequence,
 | NewWorld（新世界） | 未定，禁止购买 | 150 塞勒币 |
 | Nemesis（复仇女神） | 600 塞勒币 | 200 塞勒币 |
 
-新世界与复仇女神目前仅预留价格资产，未创建新卡牌或效果。后续义体配置引用对应价格，再加入商店的 `productDefinitions` 即可接入。缺失价格不会变成免费交易，`canPurchase` 关闭表示购买价未开放。
+新世界与复仇女神保留对应系列价格入口。实际销售内容由 `productDefinitions` 决定，义体配置引用相应 `shopPricing` 后即可沿用交易服务。缺失价格不会变成免费交易，`canPurchase` 关闭表示购买价未开放。
 
 BattleScene 仍沿用原初始余额，不自动发测试币。需要操作有费用的按钮时，进入 Play Mode，使用菜单 **Spotlight → Shop → Grant 3000 Test Coins (Play Mode)** 显式补充测试塞勒币。测试购买需要当前牌组未持有商品型号，可调整出发选择或独立战斗的初始牌组；已携带完整普罗米修斯时同型号商品会显示“已拥有”。
 
@@ -67,6 +77,12 @@ BattleScene 的 `BattleCanvas/ShopPrototypeTest` 负责示例流程，`ModalRoot
 
 ## 验证入口
 
-- EditMode：`ShopPrototypeTests` 验证显示与复用；`ShopTransactionTests` 验证余额边界、仅购买一张、原型号保留、各系列修复价格、拒绝无效交易及下一场战斗持久化。
-- PlayMode：`ShopPrototypeFlowTests` 验证真实购买、修复和回血点击、切换修复对象、TopBar 生命与余额同步、共享耐久刷新、重复开关与输入锁。
+- EditMode：`ShopArtIntegrationTests` 验证主分支美术引用与图标清理；`ShopPrototypeTests` 验证显示与复用；`ShopTransactionTests` 验证余额边界、仅购买一张、原型号保留、各系列修复价格、拒绝无效交易及下一场战斗持久化。
+- PlayMode：`ShopPrototypeFlowTests` 验证真实购买、修复和回血点击、切换修复对象、TopBar 生命与余额同步、共享耐久刷新、重复开关与输入锁，同时检查流程父节点显示顺序和淡入后的维修框鼠标射线命中。
 - 分辨率用例导出两个面板在 1920×1080、1280×720、1024×768 的截图到忽略目录 `Logs/ShopPrototype`，同时检查文本边界和实际文字生成。
+### 对话美术
+
+`ShopDialoguePanel.prefab` 沿用可复用的 `DialoguePanel.Play` 接口，使用现有 `DialogBox.png`、`NameBox.png`、`CancelButton.png` 及地下城背景；人物继续从对话数据读取，不固定为商人。说话人显示在姓名框中，继续按钮在末句显示配置的完成文案。
+
+通过 `Spotlight/Shop/Apply Existing Dialogue Artwork` 可增量应用美术，不会重建场景或替换对话脚本与配置引用。
+

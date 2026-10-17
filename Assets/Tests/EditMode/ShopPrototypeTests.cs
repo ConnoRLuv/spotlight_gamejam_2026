@@ -150,12 +150,15 @@ namespace SpotlightGameJam.Tests
             });
         }
 
-        /// <summary>预制体初始隐藏，未绑定探索时所有付费服务均禁用。</summary>
+        /// <summary>场景入口初始化隐藏后不拦截输入，未绑定探索时所有付费服务均禁用。</summary>
         [Test]
         public void ShopHasFourRepairsSixProductsAndDisabledServices()
         {
             WithPanel("ShopPanel", panel =>
             {
+                // 允许成员为编辑预览激活源预制体；实际入口创建后会立即隐藏并解除数据绑定。
+                panel.GetType().GetMethod("Hide").Invoke(panel, new object[] { 0f });
+                panel.GetType().GetMethod("Bind").Invoke(panel, new object[] { null });
                 Assert.That(panel.gameObject.activeSelf, Is.False);
                 var serialized = new SerializedObject(panel);
                 Assert.That(serialized.FindProperty("repairSlots").arraySize, Is.EqualTo(4));

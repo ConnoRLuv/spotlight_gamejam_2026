@@ -88,7 +88,7 @@ namespace SpotlightGameJam.UI
         /// <summary>响应角色属性变化，只刷新只读数值。</summary>
         private void OnPlayerChanged(CombatantState player) { Refresh(); }
 
-        /// <summary>刷新当前玩家资源与带入义体；商品区仍为只读展示原型。</summary>
+        /// <summary>刷新当前玩家资源、实际库存与商品交易资格。</summary>
         private void Refresh()
         {
             if (healthText) healthText.text = run == null ? "生命 — / —" : "生命 " + run.Player.Health + " / " + run.Player.MaxHealth;
@@ -123,6 +123,14 @@ namespace SpotlightGameJam.UI
                 var models = ModelsForPart(i);
                 var source = models.FirstOrDefault(card => repairSources[i] != null && card.Data.cyberneticId == repairSources[i].Data.cyberneticId) ?? models.FirstOrDefault();
                 repairSources[i] = source;
+                var icon = slot.Find("Icon")?.GetComponent<Image>();
+                if (icon)
+                {
+                    icon.sprite = source == null ? null : source.Card.artwork;
+                    icon.enabled = icon.sprite != null; icon.preserveAspect = true;
+                }
+                // 未提供卡图时仍显示真实部位与型号；未携带的框不留下上一份绑定的图标。
+                SetSlotText(slot, "Symbol", source != null && !source.Card.artwork ? new[] { "脑机", "躯干", "手部", "腿部" }[i] : "");
                 SetSlotText(slot, "Name", source == null ? "" : source.Card.cardName);
                 SetSlotText(slot, "Durability", source == null ? "" : "耐久 " + source.Durability + " / " + source.Data.maxDurability);
                 var repair = slot.Find("RepairButton");

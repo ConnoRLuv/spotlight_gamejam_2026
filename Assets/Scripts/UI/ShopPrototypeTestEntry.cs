@@ -57,7 +57,8 @@ namespace SpotlightGameJam.UI
             if (!parent) return;
             toolbar.GetWorldCorners(toolbarCorners);
             float bottom = parent.InverseTransformPoint(toolbarCorners[0]).y;
-            float topInset = Mathf.Clamp(parent.rect.yMax - bottom, 0, parent.rect.height);
+            // 顶栏美术下沿包含透明留边，遮罩向上衔接 12 个布局单位，避免露出底层战斗背景。
+            float topInset = Mathf.Clamp(parent.rect.yMax - bottom - 12f, 0, parent.rect.height);
             modal.anchorMin = Vector2.zero; modal.anchorMax = Vector2.one;
             modal.offsetMin = Vector2.zero;
             modal.offsetMax = new Vector2(0, -topInset);
@@ -81,6 +82,8 @@ namespace SpotlightGameJam.UI
             // 入口自身也隐藏，避免四比三屏下浮在露出的工具栏上。
             if (testButton) { testButton.interactable = false; testButton.gameObject.SetActive(false); }
             if (EventSystem.current) EventSystem.current.SetSelectedGameObject(null);
+            // 合并场景后整个流程父节点可能位于战斗布局之前；同时提升父级和内部遮罩才能真正盖住战斗。
+            transform.SetAsLastSibling();
             IsOpen = true; modalRoot.SetActive(true); modalRoot.transform.SetAsLastSibling();
             RefreshLayout();
             dialogue.Play(merchantDialogue, OpenShop, Close);
