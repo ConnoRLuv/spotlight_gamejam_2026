@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -14,6 +14,7 @@ namespace SpotlightGameJam
         public CyberneticData[] availableCybernetics = Array.Empty<CyberneticData>();
         public CyberneticData[] defaultCybernetics = Array.Empty<CyberneticData>();
         public NewWorldSetBonusData[] setBonuses = Array.Empty<NewWorldSetBonusData>();
+        public GoddessOfVengeanceSetBonusData[] goddessSetBonuses = Array.Empty<GoddessOfVengeanceSetBonusData>();
         public RunBuffData[] buffs = Array.Empty<RunBuffData>();
         public int randomSeed = 1;
         /// <summary>校验实际带入的选择，允许零至四个部位，不把未装备当作错误。</summary>
@@ -45,6 +46,9 @@ namespace SpotlightGameJam
             if (setBonuses == null) errors.Add("套装列表不能为空引用。");
             else foreach (var bonus in setBonuses)
                 if (!bonus) errors.Add("套装含空引用。"); else errors.AddRange(bonus.Validate());
+            if (goddessSetBonuses == null) errors.Add("复仇女神套装列表不能为空引用。");
+            else foreach (var bonus in goddessSetBonuses)
+                if (!bonus) errors.Add("复仇女神套装含空引用。"); else errors.AddRange(bonus.Validate());
             if (buffs == null) errors.Add("Buff 列表不能为空引用。");
             else foreach (var buff in buffs)
                 if (!buff) errors.Add("Buff 含空引用。"); else errors.AddRange(buff.Validate());
@@ -60,6 +64,7 @@ namespace SpotlightGameJam
             foreach (var data in chosen) run.Loadout.AddInitial(data);
             run.Buffs.Configure(buffs);
             run.SetBonuses.Configure(setBonuses);
+            run.GoddessSetBonuses.Configure(goddessSetBonuses);
             return run;
         }
     }

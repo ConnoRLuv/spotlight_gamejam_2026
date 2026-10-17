@@ -1,9 +1,10 @@
-namespace SpotlightGameJam
+﻿namespace SpotlightGameJam
 {
     /// <summary>单场战斗的义体临时状态；不写入共享配置，也不随冒险跨战斗保留。</summary>
     public sealed class BattleTurnEffects
     {
         public bool DamageToSanityArmed { get; internal set; }
+        public bool DamageToEnemyArmed { get; internal set; }
         public CardData ConversionAttack { get; internal set; }
         public bool ConversionEnabled => ConversionAttack != null;
         public int ExtraTurns { get; internal set; }
@@ -18,6 +19,7 @@ namespace SpotlightGameJam
         {
             // 承伤保护保留至敌人行动结束，而 AP 转换仅属于玩家行动阶段。
             DamageToSanityArmed = false;
+            DamageToEnemyArmed = false;
             ConversionAttack = null;
             OverloadApPermanent = false;
             FreeBasicCards = false;
@@ -27,7 +29,7 @@ namespace SpotlightGameJam
         /// <summary>清空临时义体效果，包括尚未消费的额外回合。</summary>
         internal void Clear()
         {
-            DamageToSanityArmed = false; ConversionAttack = null; ExtraTurns = 0;
+            DamageToSanityArmed = false; DamageToEnemyArmed = false; ConversionAttack = null; ExtraTurns = 0;
             OverloadApPermanent = false;
             DrawFromDiscardNextTurn = false; FreeBasicCards = false; CyberneticsPayHealth = false;
         }

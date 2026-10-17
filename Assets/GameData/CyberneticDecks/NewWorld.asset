@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 11ef22929c74ac44b87335d4b90d6ea9, type: 3}
+  m_Name: NewWorld
+  m_EditorClassIdentifier: 
+  deckId: new-world
+  deckName: "Type-00\uFF1A\u65B0\u4E16\u754C\uFF08\u521D\u59CB\u4E49\u4F53\uFF09"
+  reservedSetBonusDescription: 
+  cybernetics:
+  - {fileID: 11400000, guid: 98549948c15b3b747a3fc10ecef7ce3c, type: 2}
+  - {fileID: 11400000, guid: d4f1672bff36edf4b85f148865d4944a, type: 2}
+  - {fileID: 11400000, guid: 19c5a30c81c99034899ca6a1facacfe3, type: 2}
+  - {fileID: 11400000, guid: 0ca731f3dcd03fb47beba5653938b272, type: 2}

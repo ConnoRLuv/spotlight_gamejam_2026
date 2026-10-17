@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -7,10 +7,10 @@ using UnityEngine.UI;
 namespace SpotlightGameJam.UI
 {
     /// <summary>
-    /// 新世界脑机的重排面板：分普通/义体两栏展示抽牌堆，点击卡牌依次加入新顺序，确认后提交。
+    /// 新世界脑机的重排面板：每次使用只移动一张牌——先选择一张牌，再决定把它放到哪个位置。
     /// </summary>
     /// <remarks>
-    /// 只承载展示与交互，不结算费用或移动牌区；确认时把顺序封装进 CardPlayRequest 交由
+    /// 只承载展示与交互，不结算费用或移动牌区；确认时把最终顺序封装进 CardPlayRequest 交由
     /// BattleController 原子校验并执行，取消与 Esc 均不消耗资源。面板由编辑器构建工具注入控件。
     /// </remarks>
     public sealed class NewWorldBrainPanel : MonoBehaviour
@@ -18,21 +18,24 @@ namespace SpotlightGameJam.UI
         [SerializeField] private CardPrefabCatalog catalog;
         [SerializeField] private Text title;
         [SerializeField] private Text hint;
-        [SerializeField] private RectTransform ordinaryPoolRoot;
-        [SerializeField] private RectTransform ordinaryOrderRoot;
-        [SerializeField] private RectTransform cyberneticPoolRoot;
-        [SerializeField] private RectTransform cyberneticOrderRoot;
+        [SerializeField] private RectTransform ordinaryCardsRoot;
+        [SerializeField] private Button ordinaryEndButton;
+        [SerializeField] private RectTransform cyberneticCardsRoot;
+        [SerializeField] private Button cyberneticEndButton;
         [SerializeField] private Button confirmButton;
         [SerializeField] private Button cancelButton;
         [SerializeField] private Button resetButton;
 
-        private readonly List<CardInstance> ordinaryPool = new List<CardInstance>();
-        private readonly List<CardInstance> cyberneticPool = new List<CardInstance>();
-        private readonly List<CardInstance> ordinaryOrder = new List<CardInstance>();
-        private readonly List<CardInstance> cyberneticOrder = new List<CardInstance>();
+        private readonly List<CardInstance> ordinary = new List<CardInstance>();
+        private readonly List<CardInstance> cybernetic = new List<CardInstance>();
+        private readonly List<CardInstance> ordinaryOriginal = new List<CardInstance>();
+        private readonly List<CardInstance> cyberneticOriginal = new List<CardInstance>();
         private readonly List<CardView> views = new List<CardView>();
         private BattleController battle;
         private CardInstance pending;
+        private CardInstance selected;
+        private int selectedPile = -1;
+        private bool moved;
         private Action<CardPlayResult> onFinished;
         private bool wired;
 
@@ -40,12 +43,12 @@ namespace SpotlightGameJam.UI
 
         /// <summary>由构建工具注入展示控件与按钮，不绑定任何具体战斗。</summary>
         public void Configure(CardPrefabCatalog cardCatalog, Text heading, Text tip,
-            RectTransform ordinaryPool, RectTransform ordinaryOrder, RectTransform cyberneticPool, RectTransform cyberneticOrder,
+            RectTransform ordinaryCards, Button ordinaryEnd, RectTransform cyberneticCards, Button cyberneticEnd,
             Button confirm, Button cancel, Button reset)
         {
             catalog = cardCatalog; title = heading; hint = tip;
-            ordinaryPoolRoot = ordinaryPool; ordinaryOrderRoot = ordinaryOrder;
-            cyberneticPoolRoot = cyberneticPool; cyberneticOrderRoot = cyberneticOrder;
+            ordinaryCardsRoot = ordinaryCards; ordinaryEndButton = ordinaryEnd;
+            cyberneticCardsRoot = cyberneticCards; cyberneticEndButton = cyberneticEnd;
             confirmButton = confirm; cancelButton = cancel; resetButton = reset;
             WireButtons();
         }
@@ -58,10 +61,12 @@ namespace SpotlightGameJam.UI
         {
             if (controller == null || card == null) return;
             battle = controller; pending = card; onFinished = finished;
-            ordinaryPool.Clear(); ordinaryPool.AddRange(controller.Context.Ordinary.GetDrawPileOrder());
-            cyberneticPool.Clear(); cyberneticPool.AddRange(controller.Context.Cybernetic.GetDrawPileOrder());
-            ordinaryOrder.Clear(); cyberneticOrder.Clear();
-            if (title) title.text = "观看并调整抽牌堆";
+            ordinary.Clear(); ordinary.AddRange(controller.Context.Ordinary.GetDrawPileOrder());
+            cybernetic.Clear(); cybernetic.AddRange(controller.Context.Cybernetic.GetDrawPileOrder());
+            ordinaryOriginal.Clear(); ordinaryOriginal.AddRange(ordinary);
+            cyberneticOriginal.Clear(); cyberneticOriginal.AddRange(cybernetic);
+            selected = null; selectedPile = -1; moved = false;
+            if (title) title.text = "调整一张牌的位置";
             gameObject.SetActive(true);
             Refresh();
         }
@@ -72,65 +77,90 @@ namespace SpotlightGameJam.UI
             gameObject.SetActive(false);
             ClearViews();
             battle = null; pending = null; onFinished = null;
+            selected = null; selectedPile = -1; moved = false;
         }
 
-        /// <summary>重建两栏展示；全部卡牌进入新顺序后允许确认。</summary>
+        private List<CardInstance> Pile(int pile) => pile == 0 ? ordinary : cybernetic;
+
+        /// <summary>重建两栏展示；选中一张牌并放置一次后允许确认。</summary>
         private void Refresh()
         {
             ClearViews();
-            bool complete = ordinaryPool.Count + cyberneticPool.Count == 0;
-            if (hint) hint.text = complete
-                ? "已排好全部卡牌，点击确认生效。"
-                : "点击卡牌依次加入新顺序（左到右为下一张先抽到）。";
-            RenderPile(ordinaryPoolRoot, ordinaryOrderRoot, ordinaryPool, ordinaryOrder, 0);
-            RenderPile(cyberneticPoolRoot, cyberneticOrderRoot, cyberneticPool, cyberneticOrder, 1);
-            if (confirmButton) confirmButton.interactable = complete;
+            if (hint)
+            {
+                if (moved) hint.text = "已移动一张牌，点击确认生效；点重置可重来。";
+                else if (selected != null) hint.text = "已选择「" + selected.Data.cardName + "」，点击目标牌把它放到其前面，或点“放到末尾”。";
+                else hint.text = "先选择一张要移动的牌。";
+            }
+            RenderPile(ordinaryCardsRoot, ordinary, 0);
+            RenderPile(cyberneticCardsRoot, cybernetic, 1);
+            if (ordinaryEndButton) ordinaryEndButton.interactable = !moved && selectedPile == 0;
+            if (cyberneticEndButton) cyberneticEndButton.interactable = !moved && selectedPile == 1;
+            if (confirmButton) confirmButton.interactable = moved;
         }
 
-        private void RenderPile(RectTransform poolRoot, RectTransform orderRoot, List<CardInstance> pool, List<CardInstance> order, int pile)
+        private void RenderPile(RectTransform root, List<CardInstance> pile, int pileIndex)
         {
-            foreach (var card in pool) AddView(poolRoot, card, () => MoveToOrder(pile, card));
-            foreach (var card in order) AddView(orderRoot, card, () => MoveToPool(pile, card));
+            if (!root) return;
+            for (int i = 0; i < pile.Count; i++)
+            {
+                var card = pile[i];
+                var prefab = catalog ? catalog.Find(card.Data) : null;
+                if (!prefab) continue;
+                var view = Instantiate(prefab, root);
+                view.Bind(card);
+                view.SetInteractable(!moved);
+                if (selected == card) view.transform.localScale = Vector3.one * 1.08f;
+                var captured = card;
+                var capturedPile = pileIndex;
+                view.Selected += _ => OnCardClicked(capturedPile, captured);
+                views.Add(view);
+            }
         }
 
-        private void AddView(RectTransform root, CardInstance card, Action onClick)
+        private void OnCardClicked(int pileIndex, CardInstance card)
         {
-            var prefab = catalog ? catalog.Find(card.Data) : null;
-            if (!prefab || !root) return;
-            var view = Instantiate(prefab, root);
-            view.Bind(card);
-            view.SetInteractable(true);
-            view.Selected += _ => onClick();
-            views.Add(view);
+            if (battle == null || moved) return;
+            if (selected == card) { selected = null; selectedPile = -1; Refresh(); return; }
+            var pile = Pile(pileIndex);
+            if (selected != null && selectedPile == pileIndex)
+            {
+                // 把已选牌放到点击的这张牌前面。
+                pile.Remove(selected);
+                int target = pile.IndexOf(card);
+                if (target < 0) pile.Add(selected);
+                else pile.Insert(target, selected);
+                selected = null; selectedPile = -1; moved = true;
+                Refresh();
+                return;
+            }
+            // 否则切换当前选中的牌（允许改选另一张）。
+            selected = card; selectedPile = pileIndex;
+            Refresh();
         }
 
-        private void MoveToOrder(int pile, CardInstance card)
+        private void PlaceAtEnd(int pileIndex)
         {
-            var pool = pile == 0 ? ordinaryPool : cyberneticPool;
-            var order = pile == 0 ? ordinaryOrder : cyberneticOrder;
-            if (!pool.Remove(card)) return;
-            order.Add(card); Refresh();
-        }
-
-        private void MoveToPool(int pile, CardInstance card)
-        {
-            var pool = pile == 0 ? ordinaryPool : cyberneticPool;
-            var order = pile == 0 ? ordinaryOrder : cyberneticOrder;
-            if (!order.Remove(card)) return;
-            pool.Add(card); Refresh();
+            if (battle == null || moved || selected == null || selectedPile != pileIndex) return;
+            var pile = Pile(pileIndex);
+            pile.Remove(selected);
+            pile.Add(selected);
+            selected = null; selectedPile = -1; moved = true;
+            Refresh();
         }
 
         private void ResetOrder()
         {
-            ordinaryPool.AddRange(ordinaryOrder); ordinaryOrder.Clear();
-            cyberneticPool.AddRange(cyberneticOrder); cyberneticOrder.Clear();
+            ordinary.Clear(); ordinary.AddRange(ordinaryOriginal);
+            cybernetic.Clear(); cybernetic.AddRange(cyberneticOriginal);
+            selected = null; selectedPile = -1; moved = false;
             Refresh();
         }
 
         private void Confirm()
         {
-            if (battle == null || pending == null || ordinaryPool.Count + cyberneticPool.Count != 0) { Refresh(); return; }
-            var request = new CardPlayRequest(pending, reorder: ordinaryOrder.Concat(cyberneticOrder).ToArray());
+            if (battle == null || pending == null || !moved) { Refresh(); return; }
+            var request = new CardPlayRequest(pending, reorder: ordinary.Concat(cybernetic).ToArray());
             var result = battle.TryPlayRequest(request);
             var callback = onFinished;
             Close();
@@ -151,6 +181,8 @@ namespace SpotlightGameJam.UI
             if (confirmButton) confirmButton.onClick.AddListener(Confirm);
             if (cancelButton) cancelButton.onClick.AddListener(Cancel);
             if (resetButton) resetButton.onClick.AddListener(ResetOrder);
+            if (ordinaryEndButton) ordinaryEndButton.onClick.AddListener(() => PlaceAtEnd(0));
+            if (cyberneticEndButton) cyberneticEndButton.onClick.AddListener(() => PlaceAtEnd(1));
         }
 
         private void UnwireButtons()
@@ -160,6 +192,8 @@ namespace SpotlightGameJam.UI
             if (confirmButton) confirmButton.onClick.RemoveListener(Confirm);
             if (cancelButton) cancelButton.onClick.RemoveListener(Cancel);
             if (resetButton) resetButton.onClick.RemoveListener(ResetOrder);
+            if (ordinaryEndButton) ordinaryEndButton.onClick.RemoveAllListeners();
+            if (cyberneticEndButton) cyberneticEndButton.onClick.RemoveAllListeners();
         }
 
         private void ClearViews()
@@ -167,7 +201,6 @@ namespace SpotlightGameJam.UI
             foreach (var view in views)
             {
                 if (!view) continue;
-                view.Selected -= _ => { };
                 view.gameObject.SetActive(false);
                 if (Application.isPlaying) Destroy(view.gameObject); else DestroyImmediate(view.gameObject);
             }

@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b73cf5816d6822540abc3f5c9c6a3189, type: 3}
+  m_Name: NewWorld
+  m_EditorClassIdentifier: 
+  setId: new-world
+  setName: "Type-00\uFF1A\u65B0\u4E16\u754C"
+  description: "\u7A7F\u6234\u4E00\u6574\u5957\u540E\uFF0C\u6BCF\u5F53\u4F60\u6253\u51FA\u4E00\u5F20\u724C\uFF0C\u5C06\u5F03\u724C\u5806\u4E2D\u7684\u4E00\u5F20\u57FA\u672C\u724C\u52A0\u5165\u624B\u724C\uFF1B\u624B\u724C\u5DF2\u6EE1\u5219\u4E0D\u518D\u83B7\u5F97\u3002"
+  requiredParts:
+  - {fileID: 11400000, guid: 98549948c15b3b747a3fc10ecef7ce3c, type: 2}
+  - {fileID: 11400000, guid: d4f1672bff36edf4b85f148865d4944a, type: 2}
+  - {fileID: 11400000, guid: 19c5a30c81c99034899ca6a1facacfe3, type: 2}
+  - {fileID: 11400000, guid: 0ca731f3dcd03fb47beba5653938b272, type: 2}
+  trigger: 0
+  effect: 0
+  returnPolicy: 0

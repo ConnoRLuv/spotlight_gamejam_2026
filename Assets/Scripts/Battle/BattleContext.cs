@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 namespace SpotlightGameJam
@@ -65,6 +65,8 @@ namespace SpotlightGameJam
         public event Action<BattleState> StateChanged;
         // 完整成功出牌后发布，供“每打出一张牌”类全局效果订阅；结算期间不触发重入。
         public event Action<CardInstance> CardPlayed;
+        // 玩家实际失去生命后发布，供“每受到一次伤害”类全局效果订阅；结算期间同步触发。
+        public event Action PlayerDamaged;
         /// <summary>建立单场战斗上下文，关联冒险状态、牌区、敌人和随机数源。</summary>
         public BattleContext(RunState run, BattleRules rules, IReadOnlyList<CombatantState> enemies,
             CardDeck ordinary, CardDeck cybernetic, CardData phantomPain, RandomUtility random)
@@ -83,6 +85,7 @@ namespace SpotlightGameJam
             Player.Changed += OnPlayerChanged;
             Run.Buffs.Changed += OnBuffChanged;
             Run.SetBonuses.Attach(this);
+            Run.GoddessSetBonuses.Attach(this);
         }
         /// <summary>
         /// 切换阶段并通知订阅者；同一阶段不会重复触发事件。
@@ -100,6 +103,8 @@ namespace SpotlightGameJam
         internal void NotifyChanged() => Changed?.Invoke(this);
         /// <summary>完整出牌结算后广播本次打出的牌；此时该牌已进入对应弃牌堆。</summary>
         internal void NotifyCardPlayed(CardInstance card) => CardPlayed?.Invoke(card);
+        /// <summary>玩家实际失去生命后广播，供“每受到一次伤害”类全局效果处理。</summary>
+        internal void NotifyPlayerDamaged() => PlayerDamaged?.Invoke();
         public bool HasPhantomPain => Ordinary.Hand.Cards.Any(c => c.Data == PhantomPain);
         /// <summary>
         /// 理智归零登记持久幻痛并立即入手，满手随机弃普通牌；恢复为正数则移除当前幻痛。
@@ -132,6 +137,7 @@ namespace SpotlightGameJam
             if (disposed) return;
             disposed = true;
             Run.SetBonuses.Detach(this);
+            Run.GoddessSetBonuses.Detach(this);
             Player.Changed -= OnPlayerChanged; Run.Buffs.Changed -= OnBuffChanged;
             if (State != BattleState.NotStarted && !IsFinished) Run.Buffs.EndBattle();
         }

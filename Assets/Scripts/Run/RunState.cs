@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -37,6 +37,7 @@ namespace SpotlightGameJam
         public CombatantState Player { get; }
         public CyberneticLoadout Loadout { get; } = new CyberneticLoadout();
         public NewWorldSetBonusState SetBonuses { get; }
+        public GoddessOfVengeanceSetBonusState GoddessSetBonuses { get; }
         public RunBuffState Buffs { get; }
         public int Gold { get; private set; }
         // 普通冒险牌组中的唯一持久幻痛条目；战斗重建牌区时再次加入手牌，不写回共享资产。
@@ -49,6 +50,7 @@ namespace SpotlightGameJam
             if (!rules || rules.Validate().Count > 0) throw new ArgumentException("战斗规则配置不合法。");
             Player = new CombatantState("player",rules.MaxHealth,rules.MaxSanity);
             SetBonuses = new NewWorldSetBonusState(Loadout);
+            GoddessSetBonuses = new GoddessOfVengeanceSetBonusState(Loadout);
             Buffs = new RunBuffState(Loadout);
             Player.Changed += OnPlayerChanged;
             rewardView = rewards.AsReadOnly();

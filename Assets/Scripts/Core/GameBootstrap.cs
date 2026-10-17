@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -19,6 +19,8 @@ namespace SpotlightGameJam
         [SerializeField] private CyberneticDeckData initialCyberneticDeck;
         [Tooltip("穿戴一整套同系列义体即生效的全局套装；已有探索会话仍使用会话内配置。")]
         [SerializeField] private NewWorldSetBonusData[] setBonuses = Array.Empty<NewWorldSetBonusData>();
+        [Tooltip("穿戴复仇女神一整套后生效的全局套装；已有探索会话仍使用会话内配置。")]
+        [SerializeField] private GoddessOfVengeanceSetBonusData[] goddessSetBonuses = Array.Empty<GoddessOfVengeanceSetBonusData>();
         [Tooltip("直接运行战斗场景时可触发的组合 Buff；已有探索会话仍使用会话内配置。")]
         [SerializeField] private RunBuffData[] runBuffs = Array.Empty<RunBuffData>();
         [Tooltip("未选择义体牌组时使用的初始装备，也可用于自由混搭不同系列。")]
@@ -74,6 +76,8 @@ namespace SpotlightGameJam
             var errors = ValidateEncounterConfiguration(selectedCybernetics);
             foreach (var bonus in setBonuses ?? Array.Empty<NewWorldSetBonusData>())
                 if (!bonus) errors.Add("套装含空引用。"); else errors.AddRange(bonus.Validate());
+            foreach (var bonus in goddessSetBonuses ?? Array.Empty<GoddessOfVengeanceSetBonusData>())
+                if (!bonus) errors.Add("复仇女神套装含空引用。"); else errors.AddRange(bonus.Validate());
             foreach (var buff in runBuffs ?? Array.Empty<RunBuffData>())
                 if (!buff) errors.Add("组合 Buff 含空引用。"); else errors.AddRange(buff.Validate());
             var slots = new HashSet<CyberneticSlot>();
@@ -92,6 +96,7 @@ namespace SpotlightGameJam
             // 独立测试场景也配置组合定义；配置本身不会激活，仍需同回合成功打出四部位。
             nextRun.Buffs.Configure(runBuffs);
             nextRun.SetBonuses.Configure(setBonuses);
+            nextRun.GoddessSetBonuses.Configure(goddessSetBonuses);
             var candidate = CreateEncounter(nextRun,0);
             if (!candidate.StartBattle()) { candidate.Context.Dispose(); return Fail(candidate.LastError); }
             // 首场启动成功后才发布新冒险；失败不会替换旧 Run/Battle。

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 namespace SpotlightGameJam
@@ -34,10 +34,23 @@ namespace SpotlightGameJam
             }
             if (target == null || !target.IsAlive ||
                 (target != context.Player && !context.Enemies.Contains(target))) return 0;
+            // 复仇女神躯干：本回合玩家受到的伤害完全转移给存活敌人，标记持续到下回合开始。
+            if (target == context.Player && context.TurnEffects.DamageToEnemyArmed && damage > 0)
+            {
+                var bearer = context.Enemies.FirstOrDefault(enemy => enemy.IsAlive);
+                if (bearer != null)
+                {
+                    int transferred = bearer.ReceiveDamage(damage);
+                    context.CheckOutcome();
+                    return transferred;
+                }
+            }
             bool protect = target == context.Player && context.TurnEffects.DamageToSanityArmed && damage > target.Shield;
             if (protect) context.TurnEffects.DamageToSanityArmed = false;
             int result = target.ReceiveDamage(damage, protect);
             if (protect) context.EnsurePhantomPain();
+            // 玩家实际失去生命后广播，供“每受到一次伤害”类全局效果补牌。
+            if (target == context.Player && result > 0) context.NotifyPlayerDamaged();
             // 立即终结战斗，让外层牌效/敌人循环及时停止后续伤害。
             context.CheckOutcome(); return result;
         }

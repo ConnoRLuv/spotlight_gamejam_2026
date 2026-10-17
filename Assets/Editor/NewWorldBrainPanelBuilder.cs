@@ -9,13 +9,13 @@ using UnityEngine.UI;
 
 namespace SpotlightGameJam.Editor
 {
-    /// <summary>在 BattleScene 中创建新世界脑机的重排面板并接入 BattleHUD；重复执行只补齐缺失部分。</summary>
+    /// <summary>在 BattleScene 中创建新世界脑机的“移动一张牌”面板并接入 BattleHUD；重复执行只补齐缺失部分。</summary>
     public static class NewWorldBrainPanelBuilder
     {
         private static Font font;
         private static readonly Color Ink = new Color(0.17f, 0.19f, 0.21f);
 
-        /// <summary>在已接入卡牌与 HUD 的 BattleScene 上增量创建重排面板；不重建其他战斗 UI。</summary>
+        /// <summary>在已接入卡牌与 HUD 的 BattleScene 上增量创建移动面板；不重建其他战斗 UI。</summary>
         [MenuItem("Spotlight/Panels/Create NewWorld Brain Panel")]
         public static void Build()
         {
@@ -38,7 +38,7 @@ namespace SpotlightGameJam.Editor
                 serializedExisting.FindProperty("brainPanel").objectReferenceValue = existing;
                 serializedExisting.ApplyModifiedPropertiesWithoutUndo();
                 EditorSceneManager.MarkSceneDirty(scene); EditorSceneManager.SaveScene(scene);
-                Debug.Log("新世界重排面板已存在，仅补接 HUD 引用。");
+                Debug.Log("新世界移动面板已存在，仅补接 HUD 引用。");
                 return;
             }
 
@@ -56,7 +56,7 @@ namespace SpotlightGameJam.Editor
             window.gameObject.AddComponent<Image>().color = new Color(0.87f, 0.88f, 0.89f);
 
             var title = TextAt(window, "Title", new Rect(20, 6, 960, 42), 22);
-            title.text = "观看并调整抽牌堆";
+            title.text = "调整一张牌的位置";
             var hint = TextAt(window, "Hint", new Rect(20, 52, 960, 30), 16);
 
             var ordinaryColumn = Rect(window, "OrdinaryColumn", new Rect(20, 90, 470, 520));
@@ -64,20 +64,20 @@ namespace SpotlightGameJam.Editor
 
             var ordinaryLabel = TextAt(ordinaryColumn, "Label", new Rect(0, 0, 470, 30), 18);
             ordinaryLabel.text = "普通牌";
-            var ordinaryPool = Area(ordinaryColumn, "Pool", new Rect(0, 34, 470, 240));
-            var ordinaryOrder = Area(ordinaryColumn, "Order", new Rect(0, 286, 470, 234));
+            var ordinaryCards = Area(ordinaryColumn, "Cards", new Rect(0, 34, 470, 420));
+            var ordinaryEnd = MakeButton(ordinaryColumn, "End", new Rect(0, 464, 470, 36), "放到末尾", 14);
 
             var cyberneticLabel = TextAt(cyberneticColumn, "Label", new Rect(0, 0, 470, 30), 18);
             cyberneticLabel.text = "义体牌";
-            var cyberneticPool = Area(cyberneticColumn, "Pool", new Rect(0, 34, 470, 240));
-            var cyberneticOrder = Area(cyberneticColumn, "Order", new Rect(0, 286, 470, 234));
+            var cyberneticCards = Area(cyberneticColumn, "Cards", new Rect(0, 34, 470, 420));
+            var cyberneticEnd = MakeButton(cyberneticColumn, "End", new Rect(0, 464, 470, 36), "放到末尾", 14);
 
             var confirm = MakeButton(window, "Confirm", new Rect(360, 628, 160, 48), "确认", 18);
             var reset = MakeButton(window, "Reset", new Rect(540, 628, 160, 48), "重置", 18);
             var cancel = MakeButton(window, "Cancel", new Rect(720, 628, 160, 48), "取消", 18);
 
             overlay.GetComponent<NewWorldBrainPanel>().Configure(catalog, title, hint,
-                ordinaryPool, ordinaryOrder, cyberneticPool, cyberneticOrder, confirm, cancel, reset);
+                ordinaryCards, ordinaryEnd, cyberneticCards, cyberneticEnd, confirm, cancel, reset);
 
             var serialized = new SerializedObject(hud);
             serialized.FindProperty("brainPanel").objectReferenceValue = overlay.GetComponent<NewWorldBrainPanel>();
@@ -85,17 +85,17 @@ namespace SpotlightGameJam.Editor
 
             overlay.SetActive(false);
             EditorSceneManager.MarkSceneDirty(scene); EditorSceneManager.SaveScene(scene);
-            Debug.Log("新世界脑机重排面板已接入 BattleHUD。");
+            Debug.Log("新世界脑机移动面板已接入 BattleHUD。");
         }
 
-        /// <summary>在画布下查找已创建的重排面板，重复执行时复用。</summary>
+        /// <summary>在画布下查找已创建的面板，重复执行时复用。</summary>
         private static NewWorldBrainPanel FindPanel(Transform canvas)
         {
             foreach (var panel in canvas.GetComponentsInChildren<NewWorldBrainPanel>(true)) return panel;
             return null;
         }
 
-        /// <summary>创建带网格布局的卡牌区域，容纳待排序与新顺序两组卡面。</summary>
+        /// <summary>创建带网格布局的卡牌区域，按抽牌顺序展示卡面。</summary>
         private static RectTransform Area(Transform parent, string name, Rect bounds)
         {
             var root = Rect(parent, name, bounds);

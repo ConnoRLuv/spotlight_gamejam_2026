@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -14,8 +14,8 @@ namespace SpotlightGameJam
     public sealed class NewWorldBrainEffectData : CardEffectData
     {
         public override bool RequiresReorder => true;
-        public override string ReorderTitle => "观看并调整抽牌堆";
-        public override string ReorderPrompt => "按抽取顺序排列两套抽牌堆（下一张在前）；取消不消耗资源。";
+        public override string ReorderTitle => "调整一张牌的位置";
+        public override string ReorderPrompt => "选择一张牌，决定把它放到哪个位置（下一张在前）；取消不消耗资源。";
 
         /// <summary>返回参与重排的全部卡牌快照：普通抽牌堆在前、义体抽牌堆在后，均按堆顶优先。</summary>
         public override IReadOnlyList<CardInstance> GetReorderCards(BattleContext context, CardInstance card) =>
