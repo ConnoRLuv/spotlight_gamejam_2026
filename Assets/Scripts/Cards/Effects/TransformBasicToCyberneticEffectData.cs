@@ -30,7 +30,8 @@ namespace SpotlightGameJam
         /// <summary>确认目标仍在手牌且新牌放得下；不支付、不抽随机数、不改变牌区。</summary>
         public override bool CanExecuteRequest(BattleContext context, CardPlayRequest request) =>
             request.ChoiceId.HasValue && GetChoices(context, request.Card).Any(card => card.Id == request.ChoiceId.Value) &&
-            context.Cybernetic.Hand.Count - (context.Cybernetic.Hand.Contains(request.Card) ? 1 : 0) < context.Cybernetic.Hand.Capacity;
+            (context.Cybernetic.Hand.IgnoreCapacity ||
+             context.Cybernetic.Hand.Count - (context.Cybernetic.Hand.Contains(request.Card) ? 1 : 0) < context.Cybernetic.Hand.Capacity);
         /// <summary>改造必须带有玩家选择，拒绝绕过完整请求的直接执行方式。</summary>
         public override void Execute(BattleContext context, CardInstance card, CombatantState target) =>
             throw new InvalidOperationException("改造需要选择基本手牌。");

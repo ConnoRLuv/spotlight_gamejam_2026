@@ -1,0 +1,6 @@
+{
+    "name": "SpotlightGameJam.FrameworkPlayModeTests",
+    "references": ["SpotlightGameJam.Runtime", "SpotlightGameJam.UI", "RoguelikeMap.Core", "RoguelikeMap.Unity", "SpotlightGameJam.Exploration", "UnityEngine.UI"],
+    "optionalUnityReferences": ["TestAssemblies"],
+    "autoReferenced": false
+}

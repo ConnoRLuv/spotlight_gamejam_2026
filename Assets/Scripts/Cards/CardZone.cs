@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 namespace SpotlightGameJam
@@ -17,6 +17,8 @@ namespace SpotlightGameJam
         public IReadOnlyList<CardInstance> Cards => view;
         public int Count => cards.Count;
         public int Capacity { get; }
+        // 义体效果可临时解除容量上限；仅战斗运行时修改，恢复后仍按 Capacity 约束。
+        internal bool IgnoreCapacity { get; set; }
         /// <summary>创建具有容量限制的牌区，保存卡牌实例而非共享配置。</summary>
         public CardZone(int capacity)
         {
@@ -33,7 +35,7 @@ namespace SpotlightGameJam
         public bool TryAdd(CardInstance card)
         {
             // 已有归属既包括本区重复添加，也包括尚未从另一区释放的实例。
-            if (card == null || card.Zone != null || Count >= Capacity) return false;
+            if (card == null || card.Zone != null || (!IgnoreCapacity && Count >= Capacity)) return false;
             cards.Add(card); card.Zone = this; return true;
         }
         /// <summary>
@@ -50,6 +52,15 @@ namespace SpotlightGameJam
         {
             if (!Contains(card) || !card.Data.locksInHand) return false;
             cards.Remove(card); card.Zone = null; return true;
+        }
+        /// <summary>按给定顺序原地重排本区卡牌；列表必须恰好覆盖本区全部卡牌且无重复。</summary>
+        internal bool Reorder(IReadOnlyList<CardInstance> order)
+        {
+            if (order == null || order.Count != cards.Count) return false;
+            var seen = new HashSet<CardInstance>();
+            foreach (var card in order)
+                if (card == null || card.Zone != this || !seen.Add(card)) return false;
+            cards.Clear(); cards.AddRange(order); return true;
         }
         /// <summary>使用传入的随机源打乱牌区顺序。</summary>
         internal void Shuffle(RandomUtility random) => CollectionUtility.Shuffle(cards,random);

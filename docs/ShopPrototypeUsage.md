@@ -14,7 +14,7 @@
 
 ## 当前范围
 
-- 两个预制体位于 `Assets/Prefabs/UI/DialoguePanel.prefab` 和 `ShopPanel.prefab`，使用 `BasePanel` 的秒数显隐接口，默认过渡 0.15 秒。
+- 两个预制体位于 `Assets/Prefabs/UI/ShopDialoguePanel.prefab` 和 `ShopPanel.prefab`，使用 `BasePanel` 的秒数显隐接口，默认过渡 0.15 秒；`DialoguePanel.prefab` 保留主分支的对话面板资源。
 - 左侧按脑机、躯干、手部、腿部显示当前探索持有的义体型号与共享耐久。同种多张牌只显示一份，耐久为零仍保留显示。
 - 同部位有多个型号时显示“切换”按钮，默认仍为原带入型号；切换只选择修复对象，不是装备切换，也不参与 buff 判定。购买或改造获得的新型号同样可以修复，原型号不会被替换。
 - 没有持有义体的部位保留部位标识，名称、耐久和维修按钮留空。

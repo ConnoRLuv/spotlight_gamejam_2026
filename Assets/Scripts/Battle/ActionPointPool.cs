@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 namespace SpotlightGameJam
 {
     /// <summary>
@@ -11,7 +11,9 @@ namespace SpotlightGameJam
     {
         public int Normal { get; private set; }
         public int Temporary { get; private set; }
-        public int Total => Normal + Temporary;
+        // 永久行动点跨回合保留，仅整场战斗重建时清零；由义体效果经 GainActionPoints 写入。
+        public int Permanent { get; private set; }
+        public int Total => Normal + Temporary + Permanent;
         /// <summary>
         /// 将普通 AP 重置为当回合额度，同时清除上一回合临时 AP。
         /// </summary>
@@ -29,6 +31,13 @@ namespace SpotlightGameJam
             if (amount < 0) throw new ArgumentOutOfRangeException(nameof(amount));
             Temporary = checked(Temporary + amount);
         }
+        /// <summary>增加跨回合保留的永久行动点，总量不超过上限；负数或上限非法时抛异常。</summary>
+        public void AddPermanent(int amount, int cap)
+        {
+            if (amount < 0) throw new ArgumentOutOfRangeException(nameof(amount));
+            if (cap < 0) throw new ArgumentOutOfRangeException(nameof(cap));
+            Permanent = Math.Min(Permanent + amount, cap);
+        }
         /// <summary>
         /// 只检查费用是否合法且余额充足，不修改任何资源。
         /// </summary>
@@ -39,9 +48,13 @@ namespace SpotlightGameJam
         public bool TrySpend(int amount)
         {
             if (!CanSpend(amount)) return false;
-            // 临时 AP 会过期，优先花掉它，剩余费用再从普通 AP 支付。
-            int temporarySpent = Math.Min(Temporary, amount);
-            Temporary -= temporarySpent; Normal -= amount - temporarySpent;
+            // 临时 AP 会过期优先花掉，其次普通 AP，最后才消耗跨回合保留的永久 AP。
+            int remaining = amount;
+            int temporarySpent = Math.Min(Temporary, remaining);
+            Temporary -= temporarySpent; remaining -= temporarySpent;
+            int normalSpent = Math.Min(Normal, remaining);
+            Normal -= normalSpent; remaining -= normalSpent;
+            Permanent -= remaining;
             return true;
         }
         /// <summary>

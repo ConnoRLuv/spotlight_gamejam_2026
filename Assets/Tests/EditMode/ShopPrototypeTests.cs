@@ -196,7 +196,8 @@ namespace SpotlightGameJam.Tests
         /// <summary>从真实资产创建临时面板，断言结束后清理，不改动场景。</summary>
         private static void WithPanel(string name, Action<Component> assertion)
         {
-            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/UI/" + name + ".prefab");
+            var prefabName = name == "DialoguePanel" ? "ShopDialoguePanel" : name;
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/UI/" + prefabName + ".prefab");
             Assert.That(prefab, Is.Not.Null, name + " 尚未创建。");
             var root = UnityEngine.Object.Instantiate(prefab);
             try

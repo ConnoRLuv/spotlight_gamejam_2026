@@ -1,0 +1,19 @@
+{
+    "name": "RoguelikeMap.Editor",
+    "rootNamespace": "RoguelikeMap.EditorTools",
+    "references": [
+        "RoguelikeMap.Core",
+        "RoguelikeMap.Unity"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -42,7 +42,7 @@ namespace SpotlightGameJam.Editor
                 EnsureFolder("Assets/GameData", "UI"); EnsureFolder("Assets/Prefabs", "UI");
                 EnsurePrices();
                 var sequence = EnsureDialogue();
-                var dialoguePrefab = EnsurePrefab("DialoguePanel", CreateDialogue);
+                var dialoguePrefab = EnsurePrefab("ShopDialoguePanel", CreateDialogue);
                 var shopPrefab = EnsurePrefab("ShopPanel", () => CreateShop(catalog));
                 UpgradeShop(shopPrefab, catalog);
                 var wrapper = hud.transform.Find("ShopPrototypeTest");
