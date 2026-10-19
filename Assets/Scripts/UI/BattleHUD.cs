@@ -35,10 +35,10 @@ namespace SpotlightGameJam.UI
         private readonly List<CardView> handViews = new List<CardView>();
         private readonly List<CardView> choiceViews = new List<CardView>();
         private HandCardDragController handDrag;
+        private HandCardLayout handLayout;
         private BattleController battle;
         private bool cybernetic;
         private CardInstance pendingCard;
-        private float lastViewportHeight = -1;
         private readonly Vector3[] handTabCorners = new Vector3[4];
         public BattleController Battle => battle;
         public bool IsChoosing => (scene && scene.settingsPanel && scene.settingsPanel.IsOpen) ||
@@ -72,6 +72,7 @@ namespace SpotlightGameJam.UI
             if (enemyButton) enemyButton.onClick.RemoveListener(ChooseEnemy);
             if (cancelChoiceButton) cancelChoiceButton.onClick.RemoveListener(CancelSelection);
             CancelSelection(); ClearViews(handViews);
+            if (handLayout) handLayout.SetCards(handViews);
         }
 
         private void Update()
@@ -81,9 +82,8 @@ namespace SpotlightGameJam.UI
         }
         private void LateUpdate()
         {
-            // 窗口尺寸改变时只调整现有展示，不重新生成整手牌。
-            if (handScroll && handScroll.viewport && Mathf.Abs(lastViewportHeight - handScroll.viewport.rect.height) > 0.1f)
-                UpdateCardScale();
+            // 页签或窗口尺寸变化时更新可用区域，独立布局组件负责检测宽高并补间。
+            if (handScroll && handScroll.viewport) FitHandViewport();
             if (choicePanel && choicePanel.activeSelf) UpdateChoiceLayout();
         }
         /// <summary>选牌窗口限制在画布内，按视口宽度调整列数，卡牌始终由裁剪列表承载。</summary>
@@ -107,25 +107,12 @@ namespace SpotlightGameJam.UI
                 if (grid.constraintCount != columns) grid.constraintCount = columns;
             }
         }
-        /// <summary>按页签真实下沿留出手牌空间，逐张根据原始尺寸等比放大，上下保留边距。</summary>
+        /// <summary>沿用真实页签边界，交给单页布局等比缩放并预留悬停空间。</summary>
         private void UpdateCardScale()
         {
             if (!handScroll || !handScroll.viewport) return;
             FitHandViewport();
-            lastViewportHeight = handScroll.viewport.rect.height;
-            float availableHeight = Mathf.Max(1, lastViewportHeight - 8);
-            float availableWidth = Mathf.Max(1, handScroll.viewport.rect.width - 8);
-            foreach (var view in handViews)
-            {
-                if (!view) continue;
-                var rect = (RectTransform)view.transform;
-                float scale = Mathf.Min(availableHeight / Mathf.Max(1, rect.rect.height),
-                    availableWidth / Mathf.Max(1, rect.rect.width));
-                rect.localScale = Vector3.one * scale;
-            }
-            // 内容区与视口同高，让 HorizontalLayoutGroup 的垂直居中和缩放后的牌面一致。
-            cardsRoot.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, lastViewportHeight);
-            LayoutRebuilder.MarkLayoutForRebuild(cardsRoot);
+            if (handLayout) handLayout.RefreshLayout();
         }
 
         /// <summary>按普通牌和义体牌页签的实际位置预留间隔，避免固定顶部留白浪费空间或遮住页签。</summary>
@@ -423,18 +410,31 @@ namespace SpotlightGameJam.UI
                     new[] { "脑机", "躯干", "手部", "腿部" }[i] + "\n耐久 " + source.Durability + "/" + source.Data.maxDurability
                     + "\n使用 " + context.Usage.GetUses(slot) + "/3";
             }
-            ClearViews(handViews);
+            if (!handLayout) handLayout = cardsRoot.GetComponent<HandCardLayout>();
+            if (!handLayout) handLayout = cardsRoot.gameObject.AddComponent<HandCardLayout>();
+            handLayout.Configure(handScroll);
             if (!handDrag) handDrag = gameObject.AddComponent<HandCardDragController>();
             handDrag.Configure(cardsRoot, handScroll, scene.handArea, GetHandDragTarget, PlayDraggedCard, BeginHandDrag, GetHandDragHighlights);
-            foreach (var card in (cybernetic ? context.Cybernetic : context.Ordinary).Hand.Cards)
+            var wanted = (cybernetic ? context.Cybernetic : context.Ordinary).Hand.Cards;
+            foreach (var removed in handViews.Where(view => !view || !wanted.Contains(view.Instance)).ToArray())
             {
-                var view = Instantiate(catalog.Find(card.Data), cardsRoot);
-                // 尺寸由 UpdateCardScale 按真实可用区域统一计算，不再使用固定缩放上限。
-                view.BindForBattle(card, context); view.SetInteractable(canAct); view.Selected += SelectCard;
-                handViews.Add(view);
+                handViews.Remove(removed);
+                if (!removed) continue;
+                removed.Selected -= SelectCard; removed.gameObject.SetActive(false); Destroy(removed.gameObject);
+            }
+            var ordered = new List<CardView>(wanted.Count);
+            foreach (var card in wanted)
+            {
+                var view = handViews.Find(value => value.Instance == card);
+                if (!view)
+                {
+                    view = Instantiate(catalog.Find(card.Data), cardsRoot); view.Selected += SelectCard;
+                }
+                view.BindForBattle(card, context); view.SetInteractable(canAct); ordered.Add(view);
                 handDrag.Attach(view);
             }
-            if (handScroll) handScroll.horizontalNormalizedPosition = 0;
+            handViews.Clear(); handViews.AddRange(ordered);
+            handLayout.SetCards(handViews);
             UpdateCardScale();
             if (context.IsFinished) SetStatus(context.State == BattleState.Victory ? "战斗胜利" : "战斗失败");
         }

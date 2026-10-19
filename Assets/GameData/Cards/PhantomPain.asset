@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cardId: phantom-pain
   cardName: "\u5E7B\u75DB"
-  artwork: {fileID: 0}
+  artwork: {fileID: 21300000, guid: fe2b41a435a44bf7b1167a5407cbe40f, type: 3}
   description: "无法使用或弃置，占用普通手牌位置。\n跨战斗保留，理智恢复到大于 0 时移除。\n玩家造成的伤害目标随机，包含玩家自身。"
   cost: 0
   category: 3

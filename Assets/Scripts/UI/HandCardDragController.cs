@@ -11,6 +11,7 @@ namespace SpotlightGameJam.UI
     public sealed class HandCardDragController : MonoBehaviour
     {
         private ReorderableDragList dragList;
+        private HandCardLayout handLayout;
         private RectTransform modal, dragLayer, hand;
         private HandDragBackdrop backdrop;
         private Func<CardView, RectTransform> targetForCard;
@@ -44,6 +45,7 @@ namespace SpotlightGameJam.UI
             Func<CardInstance, IEnumerable<RectTransform>> highlightedObjects = null)
         {
             CancelDrag(); hand = handArea; targetForCard = validTarget; play = onDrop; starting = onStarting;
+            handLayout = cards.GetComponent<HandCardLayout>();
             highlightRoots = highlightedObjects;
             // 停用过程中的子面板回调可能先于根 HUD 的 OnDisable，缓存画布并允许查找失活父级。
             if (!canvas)
@@ -89,6 +91,7 @@ namespace SpotlightGameJam.UI
         /// <summary>完整黑幕之上只显示原角色、资源及手牌；保留立绘自身的透明轮廓。</summary>
         private void Begin(ReorderableDragItem entry)
         {
+            if (handLayout) handLayout.BeginDrag(entry.GetComponent<CardView>());
             starting?.Invoke();
             inputSystem = EventSystem.current;
             if (inputSystem)
@@ -148,6 +151,7 @@ namespace SpotlightGameJam.UI
             bool valid = released && target && RectTransformUtility.RectangleContainsScreenPoint(target, position, camera);
             var view = entry ? entry.GetComponent<CardView>() : null; var card = view ? view.Instance : null;
             RestoreInput();
+            if (handLayout) handLayout.EndDrag(view);
             if (valid && card != null && isActiveAndEnabled) play?.Invoke(card);
         }
 
