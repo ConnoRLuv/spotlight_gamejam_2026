@@ -9,7 +9,7 @@ StartSceneController 仍只负责创建会话和发布出发事件，跳转由�
 ## 配置入口
 
 - Assets/GameData/AdventureSetup.asset：规则、普通牌、幻痛、可选义体、默认选择、buff 列表、随机种子。
-- 当前直接运行 BattleScene 使用普罗米修斯测试牌组；`GameBootstrap.initialCyberneticDeck` 指向 Prometheus，`runBuffs` 配置普罗米修斯组合。已有探索会话仍使用会话牌组及 buff，不被场景测试配置覆盖。
+- 当前直接运行 BattleScene 使用复仇女神测试牌组；`GameBootstrap.initialCyberneticDeck` 指向 Nemesis，`runBuffs` 包含复仇女神组合。已有探索会话仍使用会话牌组及 buff，不被场景测试配置覆盖。
 - Assets/GameData/Cybernetics：每部位选择一种配置；cards 每个条目代表一张牌，重复引用表示多份。
 - Assets/GameData/Buffs/Prometheus.asset：四部位普罗米修斯组合。RunBuffData.requiredCybernetics 同部位候选为“或”，四部位为“且”，可配置混搭。
 - 新建 buff 使用 Create > Spotlight > 探索 > 全局 Buff；当前已实现效果为过载生命支付，其他效果通过 RunBuffEffect 和统一费用入口扩展。`duration` 配置持续范围，普罗米修斯为 `Battle`（本场战斗）；也预留 `PlayerTurn` 和 `Adventure`。

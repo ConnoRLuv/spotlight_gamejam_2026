@@ -406,6 +406,7 @@ GameObject:
   - component: {fileID: 2641263599415619350}
   - component: {fileID: 4595870993084797738}
   - component: {fileID: 7012277521159057571}
+  - component: {fileID: -585065946292063961}
   m_Layer: 5
   m_Name: LegsCard
   m_TagString: Untagged
@@ -575,3 +576,16 @@ MonoBehaviour:
   m_FlexibleWidth: -1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
+--- !u!114 &-585065946292063961
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6970054576696808608}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8adf38a49aa910d4b9c4bfed686437d1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  holdSeconds: 0.45

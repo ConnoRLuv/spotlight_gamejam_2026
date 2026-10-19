@@ -70,10 +70,36 @@ namespace SpotlightGameJam.Editor
                 value.locksInHand = true; value.targetType = CardTargetType.None;
                 value.description = "无法使用或弃置，占用普通手牌位置。\n跨战斗保留，理智恢复到大于 0 时移除。\n玩家造成的伤害目标随机，包含玩家自身。";
             });
+            ApplyBasicArtwork();
             AssetDatabase.SaveAssets();
             WireScene(cards, cybernetics, catalog, rules, phantom);
             ValidateAssets();
             Debug.Log("七种卡牌预制体、效果配置与 BattleScene 接入完成。");
+        }
+
+        /// <summary>将攻击、防御、回复绑定到同名完整卡面，保留预制体尺寸、脚本与玩法配置，不修改场景。</summary>
+        [MenuItem("Spotlight/Cards/Apply Basic Artwork")]
+        public static void ApplyBasicArtwork()
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+                throw new InvalidOperationException("请在编辑模式更新基本牌卡面。");
+            foreach (var key in Keys.Take(3))
+            {
+                var data = AssetDatabase.LoadAssetAtPath<CardData>("Assets/GameData/Cards/" + key + ".asset");
+                var artwork = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/Card/" + key + ".png");
+                if (!data || !artwork) throw new InvalidOperationException("缺少基本牌配置或美术：" + key);
+                data.artwork = artwork;
+                EditorUtility.SetDirty(data);
+                string path = "Assets/Prefabs/Cards/" + key + ".prefab";
+                var root = PrefabUtility.LoadPrefabContents(path);
+                try
+                {
+                    root.GetComponent<CardView>().Refresh();
+                    PrefabUtility.SaveAsPrefabAsset(root, path);
+                }
+                finally { PrefabUtility.UnloadPrefabContents(root); }
+            }
+            AssetDatabase.SaveAssets();
         }
 
         /// <summary>加载已有配置资产；仅在资产缺失时创建并应用初始化配置。</summary>

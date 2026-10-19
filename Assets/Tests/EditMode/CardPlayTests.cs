@@ -18,6 +18,48 @@ namespace SpotlightGameJam.Tests
         /// <summary>验证攻击扣除一点行动点并造成六点伤害。</summary>
         [SetUp] public void SetUp() => assets = new TestAssets();
         [TearDown] public void TearDown() => assets.Dispose();
+
+        /// <summary>重复查询不扣费、不移动牌或发布出牌事件，余额变化和出牌完成后立即按新状态拒绝。</summary>
+        [Test] public void StartPlayQueryIsReadOnlyAndMatchesActualPlayValidation()
+        {
+            var data = assets.Card(assets.Create<DamageEffectData>(), CardTargetType.SingleEnemy);
+            using (var context = assets.Context(new[] { data }))
+            {
+                TestAssets.Prepare(context); var card = context.Ordinary.Hand.Cards[0];
+                var battle = new BattleController(context); int notifications = 0;
+                battle.CardPlayed += (value, result) => notifications++;
+                for (int i = 0; i < 4; i++) Assert.That(battle.CanStartPlay(card, context.Enemies[0]), Is.True);
+                Assert.That(context.ActionPoints.Total, Is.EqualTo(2));
+                Assert.That(context.Enemies[0].Health, Is.EqualTo(100));
+                Assert.That(context.Ordinary.Hand.Contains(card), Is.True); Assert.That(notifications, Is.Zero);
+                Assert.That(battle.CanStartPlay(card, context.Player), Is.False);
+                context.ActionPoints.TrySpend(2); Assert.That(battle.CanStartPlay(card, context.Enemies[0]), Is.False);
+                context.ActionPoints.BeginTurn(2); Assert.That(battle.TryPlay(card, context.Enemies[0]).Success, Is.True);
+                Assert.That(notifications, Is.EqualTo(1));
+                Assert.That(battle.CanStartPlay(card, context.Enemies[0]), Is.False);
+                Assert.That(notifications, Is.EqualTo(1));
+            }
+        }
+
+        /// <summary>免费牌与既有理智透支规则沿用核心规则，UI 不独立改写费用策略。</summary>
+        [Test] public void StartPlayQueryRespectsFreeCardsAndExistingSanityRules()
+        {
+            var basic = assets.Card(assets.Create<HealEffectData>());
+            var function = assets.Card(assets.Create<HealEffectData>(), category: CardCategory.Function, ap: 0, sanity: 8);
+            using (var context = assets.Context(new[] { basic, function }))
+            {
+                TestAssets.Prepare(context);
+                var ordinary = context.Ordinary.Hand.Cards.First(card => card.Data == basic);
+                var costly = context.Ordinary.Hand.Cards.First(card => card.Data == function);
+                context.ActionPoints.TrySpend(2); Assert.That(service.CanStartPlay(context, ordinary), Is.False);
+                context.TurnEffects.FreeBasicCards = true; Assert.That(service.CanStartPlay(context, ordinary), Is.True);
+                context.Player.TrySpendSanity(context.Player.Sanity - 1);
+                Assert.That(service.CanStartPlay(context, costly), Is.True, "既有规则允许正理智透支，查询不改变规则。");
+                Assert.That(context.Player.Sanity, Is.EqualTo(1));
+                context.Player.TrySpendSanity(1); Assert.That(service.CanStartPlay(context, costly), Is.False);
+            }
+        }
+
         [Test] public void AttackDealsSixAndSpendsOneAp()
         {
             var data = assets.Card(assets.Create<DamageEffectData>(),CardTargetType.SingleEnemy);

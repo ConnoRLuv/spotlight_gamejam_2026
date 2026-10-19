@@ -14,11 +14,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   cardId: HealCard
   cardName: "\u56DE\u590D"
-  artwork: {fileID: 0}
+  artwork: {fileID: 21300000, guid: 6ba8d615b9f1c4dd69f009f7f6ba0ac9, type: 3}
   description: "\u6062\u590D 3 \u70B9\u751F\u547D\uFF0C\u4E0D\u8D85\u8FC7\u751F\u547D\u4E0A\u9650\u3002"
   cost: 1
   category: 0
   sanityCost: 0
+  requiresEquippedCybernetic: 0
   effects:
   - {fileID: 11400000, guid: 06ee8a8db98b4f6468827c6456fd549c, type: 2}
   locksInHand: 0

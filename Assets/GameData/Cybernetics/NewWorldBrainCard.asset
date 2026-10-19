@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6ee89bbc26ce1a342835e467add5f946, type: 3}
+  m_Name: NewWorldBrainCard
+  m_EditorClassIdentifier: 
+  cyberneticId: NewWorldBrainCard
+  factionId: tian-qiong-legion
+  slot: 0
+  icon: {fileID: 21300000, guid: cc15f45ee06ed43e381afe4ce1db5d40, type: 3}
+  maxDurability: 3
+  shopPricing: {fileID: 11400000, guid: a23759e829c5ad04eb38e33d9d22ecb3, type: 2}
+  cards:
+  - {fileID: 11400000, guid: 1859fc0a648706147b953fbb69bd96f2, type: 2}
+  - {fileID: 11400000, guid: 1859fc0a648706147b953fbb69bd96f2, type: 2}
+  - {fileID: 11400000, guid: 1859fc0a648706147b953fbb69bd96f2, type: 2}

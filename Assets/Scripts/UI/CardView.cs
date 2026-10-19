@@ -17,6 +17,8 @@ namespace SpotlightGameJam.UI
         [SerializeField] private Text descriptionText;
         [SerializeField] private Text sourceText;
         private BattleContext context;
+        private CardHoldPreview holdPreview;
+        private bool holdPreviewEnabled = true;
         public CardData Data => Instance?.Data ?? cardData;
         public CardInstance Instance { get; private set; }
         public event Action<CardInstance> Selected;
@@ -41,17 +43,37 @@ namespace SpotlightGameJam.UI
         public void SetInteractable(bool value) { if (button) button.interactable = value && Data && !Data.locksInHand; }
 
         private void OnEnable() { if (button) button.onClick.AddListener(HandleClick); Refresh(); }
-        private void OnDisable() { if (button) button.onClick.RemoveListener(HandleClick); }
+        private void OnDisable() { if (button) button.onClick.RemoveListener(HandleClick); if (holdPreview) holdPreview.CancelHold(); }
         private void OnValidate() { Refresh(); }
         /// <summary>转发卡面点击事件，由调用方决定出牌或选牌行为。</summary>
-        private void HandleClick() { if (Instance != null) Selected?.Invoke(Instance); }
+        private void HandleClick()
+        { if (holdPreview && holdPreview.ConsumeClick()) return; if (Instance != null) Selected?.Invoke(Instance); }
+
+        /// <summary>放大副本和由父级接收长按的缩略图可关闭自身交互，避免嵌套预览和重复圆环。</summary>
+        public void SetHoldPreviewEnabled(bool value)
+        {
+            holdPreviewEnabled = value;
+            if (!value && holdPreview) { holdPreview.CancelHold(); holdPreview.enabled = false; }
+            if (value) EnsureHoldPreview();
+        }
+
+        /// <summary>运行时所有 CardView 自动复用同一长按组件；现有商店适配器也会被识别，不重复挂载。</summary>
+        private void EnsureHoldPreview()
+        {
+            if (!Application.isPlaying || !holdPreviewEnabled || GetComponentInParent<CardPreviewOverlay>()) return;
+            if (!holdPreview) holdPreview = GetComponent<CardHoldPreview>();
+            if (!holdPreview) holdPreview = gameObject.AddComponent<CardHoldPreview>();
+            holdPreview.enabled = true;
+            holdPreview.Bind(Data, Instance, this, context);
+        }
 
         /// <summary>费用从战斗权威状态读取，生成牌寿命和耐久从实例读取；幻痛使用中性灰色。</summary>
         public void Refresh()
         {
             var data = Data;
             if (!data) return;
-            if (background) background.color = data.category == CardCategory.Special ? new Color(0.65f, 0.65f, 0.65f) : tint;
+            EnsureHoldPreview();
+            RefreshArtwork(data);
             if (nameText) nameText.text = data.cardName;
             if (costText)
             {
@@ -70,6 +92,26 @@ namespace SpotlightGameJam.UI
                 else sourceText.text = Instance != null && Instance.ExpiresAtTurnEnd ? "本回合限定 · 使用后移除" :
                     data.locksInHand ? "锁定 · 无法移出手牌" : data.category == CardCategory.Function ? "功能牌" : "基本牌";
             }
+        }
+
+        /// <summary>按实例当前配置显示完整美术；无美术的备用牌恢复文字，避免幻痛或临时转换沿用旧卡面。</summary>
+        private void RefreshArtwork(CardData data)
+        {
+            bool hasArtwork = data.artwork;
+            if (background)
+            {
+                background.sprite = data.artwork;
+                background.preserveAspect = hasArtwork;
+                background.color = hasArtwork ? Color.white :
+                    data.category == CardCategory.Special ? new Color(0.65f, 0.65f, 0.65f) : tint;
+            }
+            // 完整卡面自带名称与说明，不叠印占位文本；绑定引用仍保留供费用等数据刷新。
+            if (nameText) nameText.gameObject.SetActive(!hasArtwork);
+            if (costText) costText.gameObject.SetActive(!hasArtwork);
+            if (descriptionText) descriptionText.gameObject.SetActive(!hasArtwork);
+            if (sourceText) sourceText.gameObject.SetActive(!hasArtwork);
+            var placeholder = transform.Find("ColorPlaceholder");
+            if (placeholder) placeholder.gameObject.SetActive(!hasArtwork);
         }
     }
 }

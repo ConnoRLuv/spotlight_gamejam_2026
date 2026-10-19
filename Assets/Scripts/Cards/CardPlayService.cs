@@ -17,9 +17,10 @@ namespace SpotlightGameJam
         public CardPlayResult TryPlay(BattleContext context, CardInstance card, CombatantState target = null)
             => TryPlayRequest(context, new CardPlayRequest(card, target));
 
-        /// <summary>处理包含选牌的请求；所有验证完成后才统一支付和执行。</summary>
-        public CardPlayResult TryPlayRequest(BattleContext context, CardPlayRequest request)
+        /// <summary>统一只读校验完整请求，出牌与交互入口共用；不支付、不消耗随机数或发出事件。</summary>
+        private CardPlayResult ValidateRequest(BattleContext context, CardPlayRequest request, out CardPlayRequest resolvedRequest)
         {
+            resolvedRequest = null;
             if (context == null) throw new ArgumentNullException(nameof(context));
             var card = request?.Card;
             var target = request?.Target;
@@ -70,16 +71,17 @@ namespace SpotlightGameJam
                 return Reject(CardPlayFailure.InsufficientSanity,"理智为零，无法使用消耗理智的牌。");
             if (isCybernetic && (!context.IsUsableSource(card) || !context.Usage.CanUse(card.Source.Data.slot)))
                 return Reject(CardPlayFailure.UnavailableCybernetic,"来源义体未装备、已报废或超过使用限制。");
-            var resolvedRequest = new CardPlayRequest(card, target, request.ChoiceId, request.Reorder);
+            resolvedRequest = new CardPlayRequest(card, target, request.ChoiceId, request.Reorder);
             bool requiresChoice = card.Data.effects.Any(effect => effect.RequiresChoice);
             bool requiresReorder = card.Data.effects.Any(effect => effect.RequiresReorder);
             if (requiresChoice && !request.ChoiceId.HasValue) return Reject(CardPlayFailure.ChoiceRequired,"请先选择候选卡牌。");
             if (!requiresChoice && request.ChoiceId.HasValue) return Reject(CardPlayFailure.InvalidChoice,"该牌不接受选牌参数。");
             if (requiresReorder && request.Reorder.Count == 0) return Reject(CardPlayFailure.ReorderRequired,"请先提交牌堆顺序。");
             if (!requiresReorder && request.Reorder.Count > 0) return Reject(CardPlayFailure.InvalidChoice,"该牌不接受牌堆顺序参数。");
-            if (requiresChoice && card.Data.effects.Any(effect => effect.RequiresChoice && !effect.CanExecuteRequest(context, resolvedRequest)))
+            var effectRequest = resolvedRequest;
+            if (requiresChoice && card.Data.effects.Any(effect => effect.RequiresChoice && !effect.CanExecuteRequest(context, effectRequest)))
                 return Reject(CardPlayFailure.InvalidChoice,"候选牌已变化或当前无法取牌。");
-            if (card.Data.effects.Any(effect => !effect.CanExecuteRequest(context,resolvedRequest)))
+            if (card.Data.effects.Any(effect => !effect.CanExecuteRequest(context,effectRequest)))
                 return Reject(CardPlayFailure.InvalidTarget,"效果前置条件不满足。");
             var choiceEffect = card.Data.effects.FirstOrDefault(effect => effect.RequiresChoice);
             if (choiceEffect != null)
@@ -88,6 +90,36 @@ namespace SpotlightGameJam
                 if (choice == null) return Reject(CardPlayFailure.InvalidChoice,"候选牌已变化。");
                 resolvedRequest = new CardPlayRequest(card, target, request.ChoiceId, choice, request.Reorder);
             }
+            return CardPlayResult.Played;
+        }
+
+        /// <summary>只读判断能否开始交互；选牌使用有效候选探测，重排使用原顺序探测，均不实际出牌。</summary>
+        public bool CanStartPlay(BattleContext context, CardInstance card, CombatantState target = null)
+        {
+            var result = ValidateRequest(context, new CardPlayRequest(card, target), out _);
+            if (result.Success) return true;
+            if (result.Failure == CardPlayFailure.ChoiceRequired)
+            {
+                var effect = card.Data.effects.First(value => value.RequiresChoice);
+                return effect.GetChoices(context, card).Any(choice => ValidateRequest(context,
+                    new CardPlayRequest(card, target, choiceId: choice.Id), out _).Success);
+            }
+            if (result.Failure == CardPlayFailure.ReorderRequired)
+                return ValidateRequest(context, new CardPlayRequest(card, target, reorder:
+                    context.Ordinary.GetDrawPileOrder().Concat(context.Cybernetic.GetDrawPileOrder()).ToArray()), out _).Success;
+            return false;
+        }
+
+        /// <summary>处理完整请求；只读校验全部通过后才支付，拒绝路径保持原状态。</summary>
+        public CardPlayResult TryPlayRequest(BattleContext context, CardPlayRequest request)
+        {
+            var validation = ValidateRequest(context, request, out var resolvedRequest);
+            if (!validation.Success) return validation;
+            var card = resolvedRequest.Card;
+            var deck = context.Ordinary.Hand.Contains(card) ? context.Ordinary : context.Cybernetic;
+            bool isCybernetic = card.Data.category == CardCategory.Cybernetic;
+            bool payHealth = context.UsesHealthFor(card);
+            var choiceEffect = card.Data.effects.FirstOrDefault(effect => effect.RequiresChoice);
             int ap = context.GetEffectiveApCost(card), sanity = card.Data.sanityCost;
             // 固定本次效果顺序，避免执行过程中数组引用被替换影响当前结算。
             var effects = card.Data.effects.ToArray();
@@ -120,6 +152,8 @@ namespace SpotlightGameJam
                     effect.ExecuteRequest(context,resolvedRequest);
                     context.CheckOutcome();
                 }
+                // 致命一击结算时本牌暂时不在任何牌区，须单独恢复它的本回合转换。
+                if (context.IsFinished) card.RestoreTurnTransformation();
                 // 执行期间暂不放入弃牌堆，防止本张牌的抽牌效果立即重抽自身。
                 if (!card.ExpiresAtTurnEnd) deck.DiscardPile.TryAdd(card);
                 // 只有完整结算成功且战斗仍在进行时才累计组合；本牌费用不被自身新触发的 buff 改写。

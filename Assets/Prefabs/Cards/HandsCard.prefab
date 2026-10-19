@@ -407,6 +407,7 @@ GameObject:
   - component: {fileID: 6592734293268719869}
   - component: {fileID: 2734959365056170631}
   - component: {fileID: 9106245042530609192}
+  - component: {fileID: 6978979045881287176}
   m_Layer: 5
   m_Name: HandsCard
   m_TagString: Untagged
@@ -576,3 +577,16 @@ MonoBehaviour:
   m_FlexibleWidth: -1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
+--- !u!114 &6978979045881287176
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9101409987823612313}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8adf38a49aa910d4b9c4bfed686437d1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  holdSeconds: 0.45

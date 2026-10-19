@@ -1,6 +1,7 @@
 using System.Collections;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using SpotlightGameJam.UI;
 using UnityEngine;
@@ -27,6 +28,7 @@ namespace SpotlightGameJam.Tests
         {
             background = Application.runInBackground; Application.runInBackground = true;
             timeScale = Time.timeScale;
+            SceneManager.sceneLoaded += EnablePrototypeForTest;
             if (AdventureSession.Instance) Object.Destroy(AdventureSession.Instance.gameObject);
             yield return null;
 #if UNITY_EDITOR
@@ -49,9 +51,132 @@ namespace SpotlightGameJam.Tests
         [UnityTearDown]
         public IEnumerator TearDown()
         {
+            SceneManager.sceneLoaded -= EnablePrototypeForTest;
             if (entry) entry.enabled = false;
             if (AdventureSession.Instance) Object.Destroy(AdventureSession.Instance.gameObject);
             Time.timeScale = timeScale; Application.runInBackground = background;
+            yield return null;
+        }
+
+        /// <summary>正式战斗场景不保留商店对象；测试从共享预制体临时组装入口，不保存场景。</summary>
+        private static void EnablePrototypeForTest(Scene scene, LoadSceneMode mode)
+        {
+#if UNITY_EDITOR
+            var battleHud = scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<BattleHUD>(true)).FirstOrDefault();
+            if (!battleHud) return;
+            var wrapper = new GameObject("ShopPrototypeTest", typeof(RectTransform));
+            wrapper.SetActive(false); wrapper.layer = battleHud.gameObject.layer;
+            wrapper.transform.SetParent(battleHud.transform, false);
+            var rootRect = (RectTransform)wrapper.transform;
+            rootRect.anchorMin = Vector2.zero; rootRect.anchorMax = Vector2.one;
+            rootRect.offsetMin = rootRect.offsetMax = Vector2.zero;
+            var prototype = wrapper.AddComponent<ShopPrototypeTestEntry>();
+            var modal = new GameObject("ModalRoot", typeof(RectTransform), typeof(Image));
+            modal.layer = wrapper.layer; modal.transform.SetParent(wrapper.transform, false);
+            modal.GetComponent<Image>().color = new Color(.15f, .18f, .19f, .4f);
+            var dialoguePrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/UI/ShopDialoguePanel.prefab");
+            var shopPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/UI/ShopPanel.prefab");
+            var dialoguePanel = Object.Instantiate(dialoguePrefab, modal.transform).GetComponent<DialoguePanel>();
+            var shopPanel = Object.Instantiate(shopPrefab, modal.transform).GetComponent<ShopPanel>();
+            var buttonObject = new GameObject("TestShopButton", typeof(RectTransform), typeof(Image), typeof(Button));
+            buttonObject.layer = prototype.gameObject.layer; buttonObject.transform.SetParent(prototype.transform, false);
+            var layout = battleHud.transform.Find("BattleLayout_16x9");
+            var input = layout.GetComponent<CanvasGroup>();
+            if (!input) input = layout.gameObject.AddComponent<CanvasGroup>();
+            SetPrototypeField(prototype, "hud", battleHud);
+            SetPrototypeField(prototype, "testButton", buttonObject.GetComponent<Button>());
+            SetPrototypeField(prototype, "modalRoot", modal);
+            SetPrototypeField(prototype, "dialogue", dialoguePanel);
+            SetPrototypeField(prototype, "shop", shopPanel);
+            SetPrototypeField(prototype, "merchantDialogue", UnityEditor.AssetDatabase.LoadAssetAtPath<DialogueSequenceData>("Assets/GameData/UI/MerchantDialogue.asset"));
+            SetPrototypeField(prototype, "toolbar", layout.Find("TopBar") as RectTransform);
+            SetPrototypeField(prototype, "battleInputGroup", input);
+            dialoguePanel.Hide(0); shopPanel.Hide(0); modal.SetActive(false);
+            wrapper.SetActive(true);
+#endif
+        }
+
+        /// <summary>只为运行时测试对象接线，不更改生产组件的可见性或序列化接口。</summary>
+        private static void SetPrototypeField(ShopPrototypeTestEntry prototype, string name, Object value)
+        {
+            typeof(ShopPrototypeTestEntry).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic).SetValue(prototype, value);
+        }
+
+        /// <summary>状态条跟随真实资源更新；护盾无上限显示原数值，清空后隐藏，生命和理智归零不残留填充。</summary>
+        [UnityTest]
+        public IEnumerator ResourceBarsTrackHealthSanityShieldAndEnemy()
+        {
+            var scene = hud.GetComponent<BattleSceneReferences>();
+            var player = hud.Battle.Context.Player;
+            var health = scene.playerHealthText.transform.parent.Find("Fill");
+            var sanity = scene.sanityText.transform.parent.Find("Fill");
+            Assert.That(health, Is.Not.Null, "生命占位条应替换为带填充的状态条。");
+            Assert.That(sanity, Is.Not.Null);
+            Assert.That(health.GetComponent<Image>().color, Is.EqualTo((Color)new Color32(239, 78, 112, 255)));
+            Assert.That(sanity.GetComponent<Image>().color, Is.EqualTo((Color)new Color32(142, 116, 244, 255)));
+            player.ReceiveDamage(20); player.TrySpendSanity(10); player.AddShield(7);
+            Assert.That(((RectTransform)health).anchorMax.x, Is.EqualTo(.8f).Within(.001f));
+            Assert.That(((RectTransform)sanity).anchorMax.x, Is.EqualTo((float)player.Sanity / player.MaxSanity).Within(.001f));
+            Assert.That(scene.playerHealthText.text, Is.EqualTo("80/100"));
+            var shield = scene.playerHealthText.transform.parent.Find("ShieldBadge");
+            Assert.That(shield.gameObject.activeSelf, Is.True);
+            Assert.That(shield.GetComponent<Image>().color, Is.EqualTo((Color)new Color32(92, 181, 255, 255)));
+            Assert.That(shield.GetComponentInChildren<Text>().text, Is.EqualTo("护盾 7"));
+            player.ClearShield(); Assert.That(shield.gameObject.activeSelf, Is.False);
+            player.AddShield(200); Assert.That(shield.GetComponentInChildren<Text>().text, Is.EqualTo("护盾 200"));
+            player.ClearShield(); player.TrySpendSanity(player.Sanity); player.ReceiveDamage(80);
+            Assert.That(((RectTransform)health).anchorMax.x, Is.Zero);
+            Assert.That(((RectTransform)sanity).anchorMax.x, Is.Zero);
+            var enemy = hud.Battle.Context.Enemies[0]; enemy.ReceiveDamage(100); enemy.AddShield(5);
+            hud.RefreshDisplay();
+            var enemyHealth = scene.enemyHealthText.transform.parent.Find("Fill") as RectTransform;
+            Assert.That(enemyHealth.anchorMax.x, Is.EqualTo((float)enemy.Health / enemy.MaxHealth).Within(.001f));
+            Assert.That(scene.enemyHealthText.transform.parent.Find("ShieldBadge").GetComponentInChildren<Text>().text, Is.EqualTo("护盾 5"));
+            yield return null;
+        }
+
+        /// <summary>真实四部位激活后，抽牌堆耗尽时敌方受伤抽牌先洗回弃牌，再叠加新回合的三张普通抽牌。</summary>
+        [UnityTest]
+        public IEnumerator NemesisSetDrawsAfterEnemyHitWithAnEmptyDrawPile()
+        {
+#if UNITY_EDITOR
+            // 本用例显式选择复仇女神，不依赖成员在 BattleScene 中切换的默认测试牌组。
+            var bootstrap = Object.FindObjectOfType<GameBootstrap>();
+            var setup = new UnityEditor.SerializedObject(bootstrap);
+            setup.FindProperty("initialCyberneticDeck").objectReferenceValue =
+                UnityEditor.AssetDatabase.LoadAssetAtPath<CyberneticDeckData>("Assets/GameData/CyberneticDecks/Nemesis.asset");
+            setup.ApplyModifiedPropertiesWithoutUndo();
+            Assert.That(bootstrap.StartNewRun(), Is.True, bootstrap.LastError);
+#endif
+            var battle = hud.Battle; var context = battle.Context;
+            var attack = context.Ordinary.Hand.Cards.First(card => card.Data.category == CardCategory.Basic && card.Data.cardType == CardType.Attack);
+            Assert.That(battle.TryPlay(attack, context.Enemies[0]).Success, Is.True);
+            var parts = context.Cybernetic.Hand.Cards.Concat(context.Cybernetic.DrawPile.Cards)
+                .GroupBy(card => card.Source.Data.slot).Select(group => group.First()).OrderBy(card => card.Source.Data.slot).ToArray();
+            foreach (var card in parts)
+            {
+                if (!context.Cybernetic.Hand.Contains(card)) Assert.That(context.Cybernetic.TakeFromDrawPile(card), Is.True);
+                var result = card.Source.Data.slot == CyberneticSlot.Hands
+                    ? battle.TryPlayRequest(new CardPlayRequest(card, choiceId: attack.Id)) : battle.TryPlay(card);
+                Assert.That(result.Success, Is.True, result.Message);
+            }
+            Assert.That(context.Run.Buffs.Has(RunBuffEffect.DrawBasicOnDamage), Is.True);
+            int health = context.Player.Health;
+            Assert.That(battle.EndTurn(), Is.True);
+            Assert.That(context.Player.Health, Is.EqualTo(health), "首次敌方伤害被复仇女神躯干转移。");
+            foreach (var card in context.Ordinary.Hand.Cards.ToArray()) context.Ordinary.Discard(card);
+            foreach (var card in context.Ordinary.DrawPile.Cards.ToArray())
+            {
+                Assert.That(context.Ordinary.TakeFromDrawPile(card), Is.True);
+                Assert.That(context.Ordinary.Discard(card), Is.True);
+            }
+            Assert.That(context.Ordinary.Hand.Count, Is.Zero); Assert.That(context.Ordinary.DrawPile.Count, Is.Zero);
+            int total = context.Ordinary.DiscardPile.Count;
+            Assert.That(battle.EndTurn(), Is.True);
+            Assert.That(context.Player.Health, Is.LessThan(health));
+            Assert.That(context.Ordinary.Hand.Count, Is.EqualTo(context.Rules.OrdinaryDraw + 1), "受伤套装抽一张，再进行新回合常规抽牌。");
+            Assert.That(context.Ordinary.Hand.Count + context.Ordinary.DrawPile.Count + context.Ordinary.DiscardPile.Count, Is.EqualTo(total));
+            Assert.That(hud.GetComponentsInChildren<CardView>().Count(view => view.Data.category != CardCategory.Cybernetic), Is.EqualTo(context.Ordinary.Hand.Count));
             yield return null;
         }
 
@@ -193,10 +318,10 @@ namespace SpotlightGameJam.Tests
             var purchased = run.Loadout.Owned.Single(card => card.Data == product); purchased.TryConsumeDurability();
             Assert.That(repair.IsInteractable(), Is.False, "余额不足不能修复。");
             run.AddGold(150);
-            Assert.That(hud.GetComponent<BattleSceneReferences>().goldText.text, Is.EqualTo("塞勒币 300"));
+            Assert.That(hud.GetComponent<BattleSceneReferences>().goldText.text, Is.EqualTo("300"));
             Click(repair);
             Assert.That(run.Gold, Is.Zero); Assert.That(purchased.Durability, Is.EqualTo(product.maxDurability));
-            Assert.That(hud.GetComponent<BattleSceneReferences>().goldText.text, Is.EqualTo("塞勒币 0"));
+            Assert.That(hud.GetComponent<BattleSceneReferences>().goldText.text, Is.EqualTo("0"));
             Assert.That(context.Cybernetic.DrawPile.Cards.Concat(context.Cybernetic.Hand.Cards).Concat(context.Cybernetic.DiscardPile.Cards).Select(card => card.Id), Is.EqualTo(zones));
             Assert.That(run.Loadout.GetUsableCards().Count(card => card.Source == purchased), Is.EqualTo(1), "下场战斗生成牌组包含购买的唯一新牌。");
             entry.Close(); yield return new WaitForSecondsRealtime(0.2f);
@@ -207,7 +332,11 @@ namespace SpotlightGameJam.Tests
         public IEnumerator OwnedProductStockPersistsAcrossReopenAndResetsAtNextShop()
         {
             var run = hud.Battle.Context.Run; run.AddGold(4000); run.Shop.Enter("shop-a");
-            var data = run.Loadout.Owned.First(source => source.Data.slot == CyberneticSlot.Brain).Data;
+            // 使用真实在售商品布置“已拥有”条件，不依赖 BattleScene 当前选择哪一套测试牌组。
+            var products = (CyberneticData[])typeof(ShopPanel).GetField("productDefinitions",
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance).GetValue(shop);
+            var data = products[0];
+            if (!run.Loadout.OwnsConfiguration(data)) run.Loadout.AddInitial(data);
             int count = run.Loadout.Owned.Count(source => source.Data == data);
             var zones = hud.Battle.Context.Cybernetic.DrawPile.Cards.Concat(hud.Battle.Context.Cybernetic.Hand.Cards)
                 .Concat(hud.Battle.Context.Cybernetic.DiscardPile.Cards).Select(card => card.Id).ToArray();
@@ -241,7 +370,7 @@ namespace SpotlightGameJam.Tests
             var heal = shop.transform.Find("Layout_16x9/HealButton").GetComponent<Button>();
             Click(heal);
             Assert.That(run.Player.Health, Is.EqualTo(90)); Assert.That(run.Gold, Is.EqualTo(100));
-            Assert.That(hud.GetComponent<BattleSceneReferences>().healthText.text, Is.EqualTo("生命 90"));
+            Assert.That(hud.GetComponent<BattleSceneReferences>().healthText.text, Is.EqualTo("90"));
             Assert.That(shop.transform.Find("Layout_16x9/HealthText"), Is.Null);
             Assert.That(shop.transform.Find("Layout_16x9/HealingAmount").GetComponent<Text>().text, Is.EqualTo("+10"));
             Assert.That(shop.transform.Find("Layout_16x9/HealingPrice").GetComponent<Text>().text, Is.EqualTo("100"));
@@ -255,8 +384,8 @@ namespace SpotlightGameJam.Tests
             Assert.That(run.Gold, Is.EqualTo(100));
             run.Player.ReceiveDamage(5); Click(heal);
             Assert.That(run.Player.Health, Is.EqualTo(100)); Assert.That(run.Gold, Is.Zero);
-            Assert.That(hud.GetComponent<BattleSceneReferences>().healthText.text, Is.EqualTo("生命 100"));
-            Assert.That(hud.GetComponent<BattleSceneReferences>().goldText.text, Is.EqualTo("塞勒币 0"));
+            Assert.That(hud.GetComponent<BattleSceneReferences>().healthText.text, Is.EqualTo("100"));
+            Assert.That(hud.GetComponent<BattleSceneReferences>().goldText.text, Is.EqualTo("0"));
             entry.Close(); yield return new WaitForSecondsRealtime(0.2f);
         }
 

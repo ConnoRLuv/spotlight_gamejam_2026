@@ -88,6 +88,15 @@ namespace SpotlightGameJam
         /// 先消耗护盾，再扣生命，返回实际失去的生命值。
         /// </summary>
         public int ReceiveDamage(int amount) => ReceiveDamage(amount, false);
+        /// <summary>承受理智伤害，与支付费用区分；扣至零即停止，不消耗护盾也不溢出扣生命。</summary>
+        public int ReceiveSanityDamage(int amount)
+        {
+            RequireNonNegative(amount);
+            if (!IsAlive || amount == 0) return 0;
+            int lost = Math.Min(Sanity, amount);
+            if (lost == 0) return 0;
+            Sanity -= lost; Changed?.Invoke(this); return lost;
+        }
         /// <summary>护盾优先；启用保护时剩余伤害先消耗理智，不足部分才扣生命。</summary>
         internal int ReceiveDamage(int amount, bool convertToSanity)
         {

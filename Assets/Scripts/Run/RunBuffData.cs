@@ -5,7 +5,7 @@ using UnityEngine;
 namespace SpotlightGameJam
 {
     /// <summary>全局 buff 的效果种类；新增效果时扩展结算入口，不修改组合判定。</summary>
-    public enum RunBuffEffect { OverloadPaysHealth }
+    public enum RunBuffEffect { OverloadPaysHealth, DrawBasicOnDamage }
     /// <summary>组合成功后的持续范围；默认持续到触发的战斗结束。</summary>
     public enum RunBuffDuration { PlayerTurn, Battle, Adventure }
     /// <summary>定义同回合成功使用的四部位组合、效果及持续范围；同一部位可配置多个候选。</summary>

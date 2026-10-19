@@ -57,9 +57,10 @@ namespace SpotlightGameJam
             // 无论正常返回还是扩展效果抛异常，都释放结算锁，避免永久锁死入口。
             finally { Context.IsResolving = false; }
         }
-        /// <summary>
-        /// 转交出牌指令并通知 CardPlayed；单敌目标需显式传入，其他目标按卡牌规则处理。
-        /// </summary>
+        /// <summary>只读查询是否能开始出牌交互，不通知 CardPlayed，也不提前支付费用或耐久。</summary>
+        public bool CanStartPlay(CardInstance card, CombatantState target = null) => cards.CanStartPlay(Context, card, target);
+
+        /// <summary>转交出牌指令并通知 CardPlayed；单敌目标需显式传入，其他目标按卡牌规则处理。</summary>
         public CardPlayResult TryPlay(CardInstance card, CombatantState target = null)
         {
             var result = cards.TryPlay(Context,card,target);

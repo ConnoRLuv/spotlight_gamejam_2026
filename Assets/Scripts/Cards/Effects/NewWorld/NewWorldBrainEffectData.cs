@@ -15,7 +15,7 @@ namespace SpotlightGameJam
     {
         public override bool RequiresReorder => true;
         public override string ReorderTitle => "观看并调整抽牌堆";
-        public override string ReorderPrompt => "按抽取顺序排列两套抽牌堆（下一张在前）；取消不消耗资源。";
+        public override string ReorderPrompt => "拖动调整两套抽牌堆（下一张在前），关闭完成排序。";
 
         /// <summary>返回参与重排的全部卡牌快照：普通抽牌堆在前、义体抽牌堆在后，均按堆顶优先。</summary>
         public override IReadOnlyList<CardInstance> GetReorderCards(BattleContext context, CardInstance card) =>
@@ -46,9 +46,11 @@ namespace SpotlightGameJam
         public override bool CanExecuteRequest(BattleContext context, CardPlayRequest request) =>
             request != null && ValidateReorder(context, request.Card, request.Reorder);
 
+        /// <summary>禁止绕过完整重排请求直接执行脑机效果。</summary>
         public override void Execute(BattleContext context, CardInstance card, CombatantState target) =>
             throw new InvalidOperationException("脑机需要包含牌堆顺序的出牌请求。");
 
+        /// <summary>支付完成后应用两套独立的抽牌顺序，不移动手牌与弃牌堆中的牌。</summary>
         public override void ExecuteRequest(BattleContext context, CardPlayRequest request)
         {
             if (request == null || !ValidateReorder(context, request.Card, request.Reorder))

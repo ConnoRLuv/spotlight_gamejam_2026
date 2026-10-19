@@ -9,7 +9,7 @@ using UnityEngine.UI;
 
 namespace SpotlightGameJam.Editor
 {
-    /// <summary>增量创建普罗米修斯四部位卡组、低饱和度预制体，保留已有资产参数。</summary>
+    /// <summary>增量创建普罗米修斯四部位卡组与正式卡面预制体，保留已有玩法参数。</summary>
     public static class PrometheusAssetsBuilder
     {
         private const string FactionId = "tian-qiong-legion";
@@ -93,9 +93,49 @@ namespace SpotlightGameJam.Editor
             for (int i = 0; i < Parts.Length; i++)
                 AppendCatalogEntry(catalog, cards[i], MakePrefab(template, i, cards[i], sources[i]));
 
+            ApplyArtwork();
             AssetDatabase.SaveAssets();
             ValidateCreatedAssets(deck, cards, sources);
             Debug.Log("普罗米修斯四部位、8 张义体牌资源已接入；探索全局 buff 由出发配置负责。");
+        }
+
+        /// <summary>将四部位卡牌及已有预制体同步到 1-1 至 1-4 卡面，不修改场景、尺寸或玩法配置。</summary>
+        [MenuItem("Spotlight/Cards/Apply Prometheus Artwork")]
+        public static void ApplyArtwork()
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+                throw new InvalidOperationException("请在编辑模式更新普罗米修斯卡面。");
+            for (int i = 0; i < Parts.Length; i++)
+            {
+                string key = "Prometheus" + Parts[i] + "Card";
+                var card = AssetDatabase.LoadAssetAtPath<CardData>("Assets/GameData/Cards/" + key + ".asset");
+                var artwork = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/Card/义体牌1-" + (i + 1) + ".png");
+                if (!card || !artwork) throw new InvalidOperationException("缺少普罗米修斯卡牌或卡面：" + key);
+                card.artwork = artwork;
+                EditorUtility.SetDirty(card);
+                string path = "Assets/Prefabs/Cards/" + key + ".prefab";
+                var root = PrefabUtility.LoadPrefabContents(path);
+                try
+                {
+                    var image = root.GetComponent<Image>();
+                    image.sprite = artwork;
+                    image.color = Color.white;
+                    image.preserveAspect = true;
+                    // CardView 刷新时会重新应用 tint，保持白色以呈现原始美术颜色。
+                    var view = new SerializedObject(root.GetComponent<CardView>());
+                    view.FindProperty("tint").colorValue = Color.white;
+                    view.ApplyModifiedPropertiesWithoutUndo();
+                    // 完整卡面已包含文字；保留绑定字段供运行时更新，避免模板内容叠印。
+                    foreach (var name in new[] { "Name", "Cost", "Description", "Source", "ColorPlaceholder" })
+                    {
+                        var child = root.transform.Find(name);
+                        if (child) child.gameObject.SetActive(false);
+                    }
+                    PrefabUtility.SaveAsPrefabAsset(root, path);
+                }
+                finally { PrefabUtility.UnloadPrefabContents(root); }
+            }
+            AssetDatabase.SaveAssets();
         }
 
         /// <summary>递归创建缺失的 Unity 资产目录，不覆盖已有目录和元数据。</summary>

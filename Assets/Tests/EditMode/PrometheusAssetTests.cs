@@ -84,7 +84,7 @@ namespace SpotlightGameJam.Tests
             Assert.That(cards.Select(card => card.Id).Distinct().Count(), Is.EqualTo(8));
         }
 
-        /// <summary>改造候选覆盖目前两套天穹军团义体；只校验直接配置，避免候选之间相互递归校验。</summary>
+        /// <summary>改造候选覆盖原制式、普罗米修斯和新世界；只校验直接配置，避免递归校验。</summary>
         [Test]
         public void EffectsAndTransformationCandidatesAreConfigured()
         {
@@ -97,8 +97,8 @@ namespace SpotlightGameJam.Tests
             Assert.That(serializedCandidates, Is.Not.Null);
             var candidates = Enumerable.Range(0, serializedCandidates.arraySize)
                 .Select(index => serializedCandidates.GetArrayElementAtIndex(index).objectReferenceValue as CyberneticData).ToArray();
-            Assert.That(candidates.Length, Is.EqualTo(8));
-            Assert.That(candidates.Distinct().Count(), Is.EqualTo(8));
+            Assert.That(candidates.Length, Is.EqualTo(12));
+            Assert.That(candidates.Distinct().Count(), Is.EqualTo(12));
             Assert.That(candidates.All(value => value && new SerializedObject(value).FindProperty("factionId").stringValue == "tian-qiong-legion"), Is.True);
             foreach (var part in new[] { "Brain", "Torso", "Hands", "Legs" })
             {
@@ -106,6 +106,8 @@ namespace SpotlightGameJam.Tests
                     "Assets/GameData/Cybernetics/" + part + "Card.asset")));
                 Assert.That(candidates, Does.Contain(AssetDatabase.LoadAssetAtPath<CyberneticData>(
                     "Assets/GameData/Cybernetics/Prometheus" + part + "Card.asset")));
+                Assert.That(candidates, Does.Contain(AssetDatabase.LoadAssetAtPath<CyberneticData>(
+                    "Assets/GameData/Cybernetics/NewWorld" + part + "Card.asset")));
             }
         }
 
@@ -124,12 +126,12 @@ namespace SpotlightGameJam.Tests
             Assert.That(overload.effects.Single(), Is.TypeOf<ActionPointEffectData>());
         }
 
-        /// <summary>独立验证场景已移除，BattleScene 使用普罗米修斯供组合 Buff 测试。</summary>
+        /// <summary>独立验证场景已移除，BattleScene 当前使用新世界作为直接运行的测试牌组。</summary>
         [Test]
-        public void DedicatedSceneIsRemovedAndBattleSceneUsesPrometheus()
+        public void DedicatedSceneIsRemovedAndBattleSceneUsesNewWorld()
         {
             Assert.That(AssetDatabase.LoadAssetAtPath<SceneAsset>(ScenePath), Is.Null);
-            AssertSceneDeck("Assets/Scenes/BattleScene.unity", DeckPath);
+            AssertSceneDeck("Assets/Scenes/BattleScene.unity", "Assets/GameData/CyberneticDecks/NewWorld.asset");
         }
 
         /// <summary>读取部位正式卡牌的唯一效果，提供明确的资源缺失断言。</summary>

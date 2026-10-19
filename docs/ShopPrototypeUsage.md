@@ -67,15 +67,11 @@ dialoguePanel.Play(sequence,
 
 新世界与复仇女神保留对应系列价格入口。实际销售内容由 `productDefinitions` 决定，义体配置引用相应 `shopPricing` 后即可沿用交易服务。缺失价格不会变成免费交易，`canPurchase` 关闭表示购买价未开放。
 
-BattleScene 的 `ShopPrototypeTestEntry` 启动时将测试余额补足到 **9999 塞勒币**，仅执行一次，重复打开商店不会补币。可在 Inspector 将 `Initial Test Coins` 设为 0 关闭测试补币，移除测试入口后正式探索初始货币规则不变。需要额外测试币时也可使用菜单 **Spotlight → Shop → Grant 3000 Test Coins (Play Mode)**。短按左侧义体图标按型号收费并恢复 1 点共享耐久，满耐久不扣费，长按只预览。携带完整普罗米修斯时同型号商品仍可购买，每次商店每种商品限购一张。
+正式商店由 MapScene 的节点流程打开，BattleScene 不再保留商店测试入口，也不会赠送测试币。需要临时测试币时可使用菜单 **Spotlight → Shop → Grant 3000 Test Coins (Play Mode)**。短按左侧义体图标按型号收费并恢复 1 点共享耐久，满耐久不扣费，长按只预览。携带完整普罗米修斯时同型号商品仍可购买，每次商店每种商品限购一张。
 
-BattleScene 的 `BattleCanvas/ShopPrototypeTest` 负责示例流程，`ModalRoot` 是淡出期间仍然阻止输入的父遮罩。`ShopPrototypeTestEntry` 临时关闭 `BattleLayout_16x9` 上 CanvasGroup 的交互，退出或停用时恢复原值。
+BattleScene 中的 `BattleCanvas/ShopPrototypeTest` 整组已删除，包括商店面板、商人对话面板、父遮罩及测试组件。共享预制体和台词资产仍供地图流程复用。商店回归测试从共享预制体临时创建完整测试对象，只在运行期间存在，不写回场景；测试入口初始化一次 9999 塞勒币，重复打开不会补币。
 
-“测试商店”按钮位于 `BattleLayout_16x9/PilePanelTestControls` 中“关闭面板”的右侧，间距 12，按钮高度一致。
-
-移除测试入口时，退出 Play Mode，删除或停用 **ShopPrototypeTest** 对象以及 **PilePanelTestControls/TestShopButton**；保留两个预制体与台词资产供地图复用。单独停用入口组件也会清理已打开的窗口。
-
-菜单 **Spotlight → Shop → Create Prototype And Wire Battle Scene** 用于补齐缺失资产与引用。重复执行不重建已有预制体或覆盖成员布局，不改变 Build Settings。BattleScene 有未保存修改时会拒绝执行。
+菜单 **Spotlight → Shop → Create Prototype And Wire Battle Scene** 用于显式恢复测试入口并补齐缺失资产与引用。重复执行不重建已有预制体或覆盖成员布局，不改变 Build Settings。BattleScene 有未保存修改时会拒绝执行。
 
 ## 验证入口
 

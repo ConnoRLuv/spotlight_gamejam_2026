@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1bf10ac49ae588d45a9b82a1a9490368, type: 3}
+  m_Name: NewWorldBrainCard
+  m_EditorClassIdentifier: 
+  cardId: NewWorldBrainCard
+  cardName: "\u65B0\u4E16\u754C\xB7\u8111\u673A"
+  artwork: {fileID: 21300000, guid: 3ea96975d1c3640ceb7ab494a76cec48, type: 3}
+  description: "\u89C2\u770B\u666E\u901A\u724C\u5806\u548C\u4E49\u4F53\u724C\u5806\uFF0C\u5E76\u6309\u62BD\u53D6\u987A\u5E8F\u91CD\u6392\u4E24\u5957\u62BD\u724C\u5806\u3002"
+  cost: 0
+  category: 2
+  sanityCost: 4
+  requiresEquippedCybernetic: 0
+  effects:
+  - {fileID: 11400000, guid: 0c3466e76ca963c4f84fe3b5aa32b75f, type: 2}
+  locksInHand: 0
+  cardType: 2
+  targetType: 1

@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1bf10ac49ae588d45a9b82a1a9490368, type: 3}
+  m_Name: NemesisBrainCard
+  m_EditorClassIdentifier: 
+  cardId: NemesisBrainCard
+  cardName: "\u590D\u4EC7\u5973\u795E\xB7\u8111\u673A"
+  artwork: {fileID: 21300000, guid: a23350414f2cd4da6b62e0386cf3c839, type: 3}
+  description: "\u5C06\u5F53\u524D\u666E\u901A\u624B\u724C\u4E2D\u7684\u6240\u6709\u975E\u653B\u51FB\u724C\u4E34\u65F6\u8F6C\u4E3A\u653B\u51FB\u724C\uFF0C\u5E7B\u75DB\u4E0D\u53D8\uFF1B\u672C\u56DE\u5408\u7ED3\u675F\u6062\u590D\u539F\u724C\u3002"
+  cost: 0
+  category: 2
+  sanityCost: 2
+  requiresEquippedCybernetic: 0
+  effects:
+  - {fileID: 11400000, guid: 171cdf9b8a7a96346a16cc8401eaf735, type: 2}
+  locksInHand: 0
+  cardType: 2
+  targetType: 1

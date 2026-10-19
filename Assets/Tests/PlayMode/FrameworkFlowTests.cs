@@ -18,6 +18,17 @@ namespace SpotlightGameJam.Tests
     {
         private readonly List<UnityEngine.Object> owned = new List<UnityEngine.Object>();
 
+        /// <summary>跨场景资源用例不应领取商店测试补助；只在测试运行时隔离该入口。</summary>
+        [SetUp]
+        public void IsolateShopTestFunding() => SceneManager.sceneLoaded += DisableShopTestFunding;
+
+        /// <summary>场景加载后、Start 发放测试币前停用入口，不改写场景和正式探索资源。</summary>
+        private static void DisableShopTestFunding(Scene scene, LoadSceneMode mode)
+        {
+            foreach (var entry in scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<ShopPrototypeTestEntry>(true)))
+                entry.enabled = false;
+        }
+
         /// <summary>登记测试对象，测试完成后销毁，避免残留会话或配置。</summary>
         private T Keep<T>(T value) where T : UnityEngine.Object { owned.Add(value); return value; }
 
@@ -25,6 +36,7 @@ namespace SpotlightGameJam.Tests
         [TearDown]
         public void Cleanup()
         {
+            SceneManager.sceneLoaded -= DisableShopTestFunding;
             for (int i = owned.Count - 1; i >= 0; i--) if (owned[i]) UnityEngine.Object.DestroyImmediate(owned[i]);
             owned.Clear();
         }

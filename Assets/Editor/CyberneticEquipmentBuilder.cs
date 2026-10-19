@@ -58,34 +58,65 @@ namespace SpotlightGameJam.Editor
                     row.gameObject.AddComponent<Image>().color = new Color(1, 1, 1, 0);
                     var face = Rect(row, "CardFace");
                     Stretch(face, Vector2.zero, new Vector2(0.36f, 1), Vector2.zero, Vector2.zero);
-                    var label = Text(row, "Name", font, 12);
-                    Stretch(label.rectTransform, new Vector2(0.39f, 0.43f), new Vector2(1, 0.92f), Vector2.zero, Vector2.zero);
                     var durability = Text(row, "Durability", font, 12);
                     Stretch(durability.rectTransform, new Vector2(0.39f, 0.15f), new Vector2(1, 0.4f), Vector2.zero, Vector2.zero);
                     slots[i] = row.gameObject.AddComponent<CyberneticEquipmentSlot>();
-                    slots[i].Configure((CyberneticSlot)i, catalog, face, label, durability, tooltip);
+                    slots[i].Configure((CyberneticSlot)i, catalog, face, null, durability, tooltip);
                 }
-                // 为已有槽位增量补齐标题，为部位信息让出独立区域。
-                var slotRoot = slots[i].GetComponent<RectTransform>();
-                var partTransform = slotRoot.Find("Part");
-                var part = partTransform ? partTransform.GetComponent<Text>() : Text(slotRoot, "Part", font, 14);
-                part.fontStyle = FontStyle.Bold; part.text = slots[i].SlotName;
-                // 中文字体行高大于字号，自动适配标题高度，避免文本整体被截断。
-                part.resizeTextForBestFit = true; part.resizeTextMinSize = 8; part.resizeTextMaxSize = 14;
-                part.alignment = TextAnchor.MiddleLeft;
-                Stretch(part.rectTransform, new Vector2(0.02f, 0.76f), new Vector2(0.98f, 1), Vector2.zero, Vector2.zero);
-                Stretch((RectTransform)slotRoot.Find("CardFace"), new Vector2(0, 0.03f), new Vector2(0.36f, 0.74f), Vector2.zero, Vector2.zero);
-                Stretch((RectTransform)slotRoot.Find("Name"), new Vector2(0.39f, 0.32f), new Vector2(1, 0.74f), Vector2.zero, Vector2.zero);
-                Stretch((RectTransform)slotRoot.Find("Durability"), new Vector2(0.39f, 0.03f), new Vector2(1, 0.28f), Vector2.zero, Vector2.zero);
-                var slotFields = new SerializedObject(slots[i]); slotFields.FindProperty("slotText").objectReferenceValue = part;
-                slotFields.ApplyModifiedPropertiesWithoutUndo();
             }
             var hud = new SerializedObject(references.GetComponent<BattleHUD>());
             var field = hud.FindProperty("equipmentSlots"); field.arraySize = slots.Length;
             for (int i = 0; i < slots.Length; i++) field.GetArrayElementAtIndex(i).objectReferenceValue = slots[i];
             hud.ApplyModifiedPropertiesWithoutUndo();
+            ApplyIconLayout(references);
             EditorSceneManager.MarkSceneDirty(scene); EditorSceneManager.SaveScene(scene); AssetDatabase.SaveAssets();
             Debug.Log("左侧空装备槽和义体大图悬停说明已接入 BattleScene。");
+        }
+
+        /// <summary>增量将左侧展示框调整为四行图标和耐久，移除多余文字并保留边框内的安全边距。</summary>
+        public static void ApplyIconLayout(BattleSceneReferences references)
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode) throw new InvalidOperationException("请先退出 Play Mode。");
+            var area = references.cyberneticDurabilityArea;
+            area.anchorMin = area.anchorMax = new Vector2(240f / 1928, 1 - 513f / 1088);
+            area.pivot = new Vector2(.5f, .5f); area.anchoredPosition = Vector2.zero;
+            area.sizeDelta = new Vector2(184, 300);
+            var background = area.Find("Background") as RectTransform;
+            if (background)
+            {
+                background.anchorMin = background.anchorMax = background.pivot = new Vector2(.5f, .5f);
+                background.anchoredPosition = Vector2.zero; background.sizeDelta = new Vector2(216, 352);
+                var image = background.GetComponent<Image>();
+                if (image) { image.preserveAspect = true; image.raycastTarget = false; }
+            }
+            var font = AssetDatabase.LoadAssetAtPath<Font>("Assets/Fonts/荆南俊俊体.ttf");
+            foreach (var slot in area.GetComponentsInChildren<CyberneticEquipmentSlot>(true))
+            {
+                int i = (int)slot.Slot;
+                var row = (RectTransform)slot.transform;
+                Stretch(row, new Vector2(0, 1 - (i + 1) / 4f), new Vector2(1, 1 - i / 4f), new Vector2(5, 4), new Vector2(-5, -4));
+                // 四个常显的深色半透明槽位共用原输入底图，彼此留出间隔。
+                row.GetComponent<Image>().color = new Color(.02f, .03f, .09f, .78f);
+                // 先解除旧文字引用，再删除对象；运行时仅保留耐久，长按仍能查看完整卡面信息。
+                var fields = new SerializedObject(slot);
+                fields.FindProperty("nameText").objectReferenceValue = null;
+                fields.FindProperty("slotText").objectReferenceValue = null;
+                fields.ApplyModifiedPropertiesWithoutUndo();
+                foreach (string name in new[] { "Part", "Name" })
+                {
+                    var old = row.Find(name);
+                    if (old) UnityEngine.Object.DestroyImmediate(old.gameObject);
+                }
+                Stretch((RectTransform)row.Find("CardFace"), new Vector2(.04f, .08f), new Vector2(.36f, .92f), Vector2.zero, Vector2.zero);
+                Stretch((RectTransform)row.Find("Durability"), new Vector2(.42f, 0), new Vector2(.97f, 1), Vector2.zero, Vector2.zero);
+                var text = row.Find("Durability").GetComponent<Text>();
+                text.font = font; text.fontSize = 24; text.fontStyle = FontStyle.Normal;
+                text.resizeTextForBestFit = false; text.alignment = TextAnchor.MiddleLeft;
+                text.horizontalOverflow = HorizontalWrapMode.Wrap; text.verticalOverflow = VerticalWrapMode.Truncate;
+                text.color = Color.white; text.raycastTarget = false;
+                slot.Refresh(null);
+            }
+            EditorUtility.SetDirty(references);
         }
         /// <summary>创建装备详情预制体，配置大卡面、描述和统计文本引用。</summary>
         private static GameObject CreateTooltip(CardPrefabCatalog catalog, Font font)

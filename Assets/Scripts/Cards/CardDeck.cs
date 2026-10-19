@@ -59,9 +59,7 @@ namespace SpotlightGameJam
                 {
                     if (DrawPile.Count == 0)
                     {
-                        foreach (var discarded in recyclable)
-                            if (DiscardPile.TryRemove(discarded)) DrawPile.TryAdd(discarded);
-                        DrawPile.Shuffle(random);
+                        RecycleDiscard(recyclable);
                         recyclable.Clear();
                     }
                     if (DrawPile.Count == 0) break;
@@ -74,6 +72,23 @@ namespace SpotlightGameJam
                 else DiscardPile.TryAdd(card);
             }
             return added;
+        }
+
+        /// <summary>按堆顶方向抽取一张基本牌；空堆先洗回弃牌，功能牌留在堆中，满手时不移动或洗牌。</summary>
+        public bool DrawBasic()
+        {
+            if (!CanAddToHand()) return false;
+            if (DrawPile.Count == 0) RecycleDiscard(DiscardPile.Cards.ToArray());
+            var basic = GetDrawPileOrder().FirstOrDefault(card => card.Data.category == CardCategory.Basic);
+            return basic != null && TakeFromDrawPile(basic);
+        }
+
+        /// <summary>将指定弃牌快照洗回抽牌堆；普通抽牌保留调用开始时的快照，避免溢出弃牌被重复抽取。</summary>
+        private void RecycleDiscard(IEnumerable<CardInstance> candidates)
+        {
+            foreach (var card in candidates)
+                if (DiscardPile.TryRemove(card)) DrawPile.TryAdd(card);
+            DrawPile.Shuffle(random);
         }
         /// <summary>
         /// 将本套手牌中的非锁定牌移至弃牌堆；不接受外部牌或幻痛。
@@ -111,6 +126,9 @@ namespace SpotlightGameJam
             foreach (var zone in new[] { Hand, DrawPile, DiscardPile })
                 foreach (var card in zone.Cards.Where(card => card.ExpiresAtTurnEnd).ToArray()) zone.TryRemove(card);
         }
+        /// <summary>清除三个牌区中的临时卡面转换，不移动卡牌，也不改变持久牌组。</summary>
+        internal void RestoreTurnTransformations()
+        { foreach (var card in AllCards) card.RestoreTurnTransformation(); }
         /// <summary>
         /// 只执行牌区层面的出牌移出，不结算效果或费用；完整出牌请调用 BattleController。
         /// </summary>

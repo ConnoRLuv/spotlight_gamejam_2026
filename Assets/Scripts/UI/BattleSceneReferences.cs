@@ -12,6 +12,7 @@ namespace SpotlightGameJam.UI
         [Header("顶部状态栏")]
         public Text healthText;
         public Text goldText;
+        // 战斗顶栏已移除地图进度，保留旧字段供既有场景序列化兼容，允许为空。
         public Text mapProgressText;
         public Button settingsButton;
 
@@ -24,6 +25,13 @@ namespace SpotlightGameJam.UI
         public Text enemyHealthText;
         public Text enemyNameText;
         public GameObject enemyTooltip;
+
+        [Header("角色资源条")]
+        public Image playerHealthFill;
+        public Image playerSanityFill;
+        public Image enemyHealthFill;
+        public Text playerShieldText;
+        public Text enemyShieldText;
 
         [Header("手牌与回合操作")]
         public Text actionPointsText;
