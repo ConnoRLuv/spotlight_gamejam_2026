@@ -19,6 +19,22 @@ namespace SpotlightGameJam.Tests
         private BattleHUD hud;
         private GameObject extra;
 
+        /// <summary>校验回调不可添加运行时组件；真正启用卡牌后仍自动安装长按预览。</summary>
+        [UnityTest]
+        public IEnumerator EditorValidationDoesNotInstallRuntimeHoldComponents()
+        {
+            extra = new GameObject("ValidationOnlyCard", typeof(RectTransform)); extra.SetActive(false);
+            var view = extra.AddComponent<CardView>();
+#if UNITY_EDITOR
+            var data = UnityEditor.AssetDatabase.LoadAssetAtPath<CardData>("Assets/GameData/Cards/AttackCard.asset");
+            typeof(CardView).GetField("cardData", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(view, data);
+#endif
+            typeof(CardView).GetMethod("OnValidate", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(view, null);
+            Assert.That(view.GetComponent<CardHoldPreview>(), Is.Null, "OnValidate 不应安装运行时组件。");
+            extra.SetActive(true); yield return null;
+            Assert.That(view.GetComponent<CardHoldPreview>(), Is.Not.Null, "OnEnable 应正常初始化长按预览。");
+        }
+
         /// <summary>加载真实战斗并隔离商店测试入口，验证过程不保存场景或资源。</summary>
         [UnitySetUp]
         public IEnumerator SetUp()
