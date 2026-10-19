@@ -1,0 +1,54 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9ecabf68fc20fae47be6aff48e7e4e80, type: 3}
+  m_Name: AdventureSetup_CurrentTest
+  m_EditorClassIdentifier: 
+  rules: {fileID: 11400000, guid: 5ce8cf4f4eb801344be462d3f8347faf, type: 2}
+  phantomPain: {fileID: 11400000, guid: 993cf03c107e65944a68bc0200c07050, type: 2}
+  ordinaryDeck:
+  - {fileID: 11400000, guid: c19f0ff3297c5b443849332e38139be1, type: 2}
+  - {fileID: 11400000, guid: c19f0ff3297c5b443849332e38139be1, type: 2}
+  - {fileID: 11400000, guid: c19f0ff3297c5b443849332e38139be1, type: 2}
+  - {fileID: 11400000, guid: c19f0ff3297c5b443849332e38139be1, type: 2}
+  - {fileID: 11400000, guid: da3377f691396e541ad2893d785484e5, type: 2}
+  - {fileID: 11400000, guid: da3377f691396e541ad2893d785484e5, type: 2}
+  - {fileID: 11400000, guid: da3377f691396e541ad2893d785484e5, type: 2}
+  - {fileID: 11400000, guid: 742f18cc88b42e446af7a7232f54f036, type: 2}
+  - {fileID: 11400000, guid: 742f18cc88b42e446af7a7232f54f036, type: 2}
+  - {fileID: 11400000, guid: 742f18cc88b42e446af7a7232f54f036, type: 2}
+  - {fileID: 11400000, guid: cf726b8d3c130e34e829d6a9c9d067a6, type: 2}
+  - {fileID: 11400000, guid: cf726b8d3c130e34e829d6a9c9d067a6, type: 2}
+  - {fileID: 11400000, guid: cf726b8d3c130e34e829d6a9c9d067a6, type: 2}
+  availableCybernetics:
+  - {fileID: 11400000, guid: c9f2859fb7a6c2844a1adf5278db7519, type: 2}
+  - {fileID: 11400000, guid: 59389bece467fcd4ea32a0ddcafaf009, type: 2}
+  - {fileID: 11400000, guid: 9f3282cf1d61b3b45a59ea9da05ba3dd, type: 2}
+  - {fileID: 11400000, guid: c2953cfb253072848b0b1fce37c9a452, type: 2}
+  - {fileID: 11400000, guid: 8a100b3a3ba05464d86cd0fc1f385e50, type: 2}
+  - {fileID: 11400000, guid: c211987d005301b46ac29db0cbb608be, type: 2}
+  - {fileID: 11400000, guid: a8826942eb183b04db66d6c400aee0c5, type: 2}
+  - {fileID: 11400000, guid: f82398a63c14b584e84ff465ea02958e, type: 2}
+  - {fileID: 11400000, guid: bbd3f1bdda549aa48919a12244b90809, type: 2}
+  - {fileID: 11400000, guid: fa7a2256cb03db7478eda3054d80a0e1, type: 2}
+  - {fileID: 11400000, guid: c36883ec50ddf294797fa04526071c21, type: 2}
+  - {fileID: 11400000, guid: 21f94ff874bd1fc4cb96e14053f24e41, type: 2}
+  defaultCybernetics:
+  - {fileID: 11400000, guid: 8a100b3a3ba05464d86cd0fc1f385e50, type: 2}
+  - {fileID: 11400000, guid: c211987d005301b46ac29db0cbb608be, type: 2}
+  - {fileID: 11400000, guid: a8826942eb183b04db66d6c400aee0c5, type: 2}
+  - {fileID: 11400000, guid: f82398a63c14b584e84ff465ea02958e, type: 2}
+  setBonuses:
+  - {fileID: 11400000, guid: df29d67067df21c4583ec06340bc0a9c, type: 2}
+  buffs:
+  - {fileID: 11400000, guid: 1aa9b4dbc4c37f948af59d62bad13ce4, type: 2}
+  - {fileID: 11400000, guid: bd02e906fdff701478a779e8ad834596, type: 2}
+  randomSeed: 1

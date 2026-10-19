@@ -44,7 +44,11 @@ namespace SpotlightGameJam.UI
 
         private void OnEnable() { if (button) button.onClick.AddListener(HandleClick); Refresh(); }
         private void OnDisable() { if (button) button.onClick.RemoveListener(HandleClick); if (holdPreview) holdPreview.CancelHold(); }
-        private void OnValidate() { Refresh(); }
+        private void OnValidate()
+        {
+            // 运行时的序列化校验不能增删组件；长按入口统一由 OnEnable 或显式绑定初始化。
+            if (!Application.isPlaying) Refresh();
+        }
         /// <summary>转发卡面点击事件，由调用方决定出牌或选牌行为。</summary>
         private void HandleClick()
         { if (holdPreview && holdPreview.ConsumeClick()) return; if (Instance != null) Selected?.Invoke(Instance); }

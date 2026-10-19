@@ -124,7 +124,13 @@ namespace SpotlightGameJam.Tests
         private static IEnumerator VerifySelection(int[] indices,int count)
         {
             var controller = UnityEngine.Object.FindObjectOfType<StartSceneController>(); Assert.That(controller,Is.Not.Null);
-            var setup = Field<AdventureSetupData>(controller,"setup"); Assert.That(setup.availableCybernetics.Length,Is.EqualTo(16));
+            var setup = Field<AdventureSetupData>(controller,"setup");
+#if UNITY_EDITOR
+            // 完整牌组规则回归使用完整配置，不受开始界面临时隐藏某系列的测试配置影响。
+            setup = UnityEditor.AssetDatabase.LoadAssetAtPath<AdventureSetupData>("Assets/GameData/AdventureSetup.asset");
+            typeof(StartSceneController).GetField("setup", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(controller, setup);
+#endif
+            Assert.That(setup.availableCybernetics.Length,Is.EqualTo(16));
             controller.ClearSelection();
             var selected = indices.Select(i=>setup.availableCybernetics[i]).ToArray();
             foreach (var data in selected)

@@ -15,8 +15,12 @@ namespace SpotlightGameJam.UI
         [SerializeField] private Button settingsButton, storyButton;
         [SerializeField] private RectTransform optionsRoot, cardPreviewRoot;
         [SerializeField] private Text detailTitle, detailInfo, summary, buffs, status;
+        [SerializeField] private Sprite partNormalFrame, partSelectedFrame, optionNormalFrame, optionSelectedFrame;
+        [SerializeField] private Sprite[] partFallbackIcons;
+        [SerializeField] private Font selectionFont;
         private readonly CyberneticData[] selected = new CyberneticData[4];
         private readonly List<Button> options = new List<Button>();
+        private readonly List<CyberneticData> optionData = new List<CyberneticData>();
         private CyberneticSlot part;
         private CyberneticData candidate;
         private bool initialized;
@@ -131,15 +135,19 @@ namespace SpotlightGameJam.UI
         private void BuildOptions()
         {
             if (!optionsRoot || !partButtons?.FirstOrDefault()) return;
-            ClearChildren(optionsRoot); options.Clear();
+            ClearChildren(optionsRoot); options.Clear(); optionData.Clear();
             foreach (var data in (setup.availableCybernetics ?? Array.Empty<CyberneticData>()).Where(value => value && value.slot == part).Distinct())
             {
                 var button = Instantiate(partButtons[0], optionsRoot); button.name = data.name + "Option";
                 button.onClick = new Button.ButtonClickedEvent();
                 var captured = data; button.onClick.AddListener(() => PreviewCybernetic(captured));
                 var text = button.GetComponentInChildren<Text>();
-                if (text) { text.fontSize = 16; text.text = data.cards[0].cardName + "\n" + data.cards.Length + " 张\n共享耐久 " + data.maxDurability; }
-                options.Add(button);
+                var tile = PrepareTile(button, false);
+                if (tile)
+                    tile.SetContent(data.icon ? data.icon : PartIcon(data.slot), SelectionName(data),
+                        "", "耐久 " + data.maxDurability);
+                else if (text) { text.fontSize = 16; text.text = SelectionName(data) + "\n耐久 " + data.maxDurability; }
+                options.Add(button); optionData.Add(data);
             }
         }
         /// <summary>更新牌组摘要、共享耐久提示和预计 buff，不改变实际探索状态。</summary>
@@ -148,13 +156,27 @@ namespace SpotlightGameJam.UI
             var names = new[] { "脑机", "躯干", "手部", "腿部" };
             for (int i = 0; partButtons != null && i < partButtons.Length && i < 4; i++)
             {
-                var label = partButtons[i].GetComponentInChildren<Text>();
-                if (label) label.text = names[i] + "\n" + (selected[i] ? selected[i].cards.Length + " 张" : "未装备");
-                partButtons[i].GetComponent<Image>().color = i == (int)part ? new Color(.46f, .52f, .52f) : new Color(.46f, .46f, .46f);
+                var tile = PrepareTile(partButtons[i], true);
+                if (tile)
+                {
+                    var artwork = selected[i] && selected[i].icon ? selected[i].icon : PartIcon((CyberneticSlot)i);
+                    tile.SetContent(artwork, names[i], "", "");
+                    tile.SetSelected(i == (int)part);
+                }
+                else
+                {
+                    var label = partButtons[i].GetComponentInChildren<Text>();
+                    if (label) label.text = names[i];
+                    partButtons[i].GetComponent<Image>().color = i == (int)part ? new Color(.46f, .52f, .52f) : new Color(.46f, .46f, .46f);
+                }
+            }
+            for (int i = 0; i < options.Count; i++)
+            {
+                var tile = options[i].GetComponent<CyberneticSelectionTile>();
+                if (tile) tile.SetSelected(optionData[i] == candidate);
             }
             if (summary) summary.text = string.Join("\n", Enumerable.Range(0, 4).Select(i =>
-                names[i] + "：" + (selected[i] ? selected[i].cards[0].cardName + " ×" + selected[i].cards.Length : "未装备"))) +
-                "\n义体牌合计：" + Selection.Sum(data => data.cards.Length) + " 张";
+                names[i] + "：" + (selected[i] ? SelectionName(selected[i]) : "未装备")));
             if (buffs)
             {
                 var preview = new CyberneticLoadout();
@@ -163,11 +185,12 @@ namespace SpotlightGameJam.UI
                     .Select(buff => buff.buffName + "\n" + buff.description)
                     .Concat((setup.setBonuses ?? Array.Empty<NewWorldSetBonusData>()).Where(set => set && set.Validate().Count == 0 && set.IsComplete(preview))
                         .Select(set => set.setName + "\n" + set.description)).ToArray();
-                buffs.text = available.Length == 0 ? "可触发 buff：无完整组合" : "可触发 buff（同回合打出四部位）\n" + string.Join("\n", available);
+                buffs.text = string.Join("\n\n", available);
+                buffs.transform.parent.gameObject.SetActive(available.Length > 0);
             }
-            if (detailTitle) detailTitle.text = candidate ? candidate.cards[0].cardName : "未选择义体";
-            if (detailInfo) detailInfo.text = candidate ? names[(int)candidate.slot] + " · " + candidate.cards.Length +
-                " 张\n共享耐久 " + candidate.maxDurability : "该部位可留空出发";
+            if (detailTitle) detailTitle.text = candidate ? SelectionName(candidate) + " • " + names[(int)candidate.slot] : "未选择义体";
+            if (detailInfo) detailInfo.text = candidate ? "耐久 " + candidate.maxDurability +
+                " · " + candidate.cards.Length + "张" : "该部位可留空出发";
             if (replaceButton) replaceButton.interactable = candidate;
             RefreshCardPreview();
         }
@@ -178,7 +201,13 @@ namespace SpotlightGameJam.UI
             ClearChildren(cardPreviewRoot);
             if (!candidate || !catalog) return;
             var prefab = catalog.Find(candidate.cards[0]); if (!prefab) return;
-            var card = Instantiate(prefab, cardPreviewRoot); previewCard = card; card.SetInteractable(false);
+            var card = Instantiate(prefab, cardPreviewRoot); previewCard = card;
+            // 只读卡面关闭点击但不使用禁用态 tint，避免完整美术被置灰。
+            var previewButton = card.GetComponent<Button>();
+            if (previewButton) previewButton.transition = Selectable.Transition.None;
+            card.SetInteractable(false);
+            if (previewButton && previewButton.targetGraphic)
+                previewButton.targetGraphic.CrossFadeColor(Color.white, 0, true, true);
             foreach (var graphic in card.GetComponentsInChildren<Graphic>()) graphic.raycastTarget = false;
             // 禁止出牌点击，但保留根卡面的射线供共用长按预览使用。
             card.GetComponent<Image>().raycastTarget = true;
@@ -194,6 +223,31 @@ namespace SpotlightGameJam.UI
             var rect = previewCard.GetComponent<RectTransform>();
             if (rect.rect.width <= 0 || rect.rect.height <= 0) return;
             rect.localScale = Vector3.one * Mathf.Min(previewSize.x / rect.rect.width, previewSize.y / rect.rect.height);
+        }
+        /// <summary>新资源未配置时兼容旧场景；动态选项始终使用其自身的底框类型。</summary>
+        private CyberneticSelectionTile PrepareTile(Button button, bool partTab)
+        {
+            var normal = partTab ? partNormalFrame : optionNormalFrame;
+            var highlighted = partTab ? partSelectedFrame : optionSelectedFrame;
+            if (!normal || !highlighted) return null;
+            var tile = button.GetComponent<CyberneticSelectionTile>();
+            if (!tile) tile = button.gameObject.AddComponent<CyberneticSelectionTile>();
+            var label = button.GetComponentInChildren<Text>(true);
+            tile.Configure(normal, highlighted, partTab, selectionFont ? selectionFont : label ? label.font : null);
+            return tile;
+        }
+        private static string SelectionName(CyberneticData data)
+        {
+            return System.Text.RegularExpressions.Regex.Replace(data.cards[0].cardName,
+                @"\s*[·•]\s*(脑机|躯干|手部|腿部)\s*$", "").Trim();
+        }
+        private Sprite PartIcon(CyberneticSlot slot)
+        {
+            int index = (int)slot;
+            if (partFallbackIcons != null && index < partFallbackIcons.Length && partFallbackIcons[index])
+                return partFallbackIcons[index];
+            return (setup.availableCybernetics ?? Array.Empty<CyberneticData>())
+                .FirstOrDefault(data => data && data.slot == slot && data.icon)?.icon;
         }
         /// <summary>替换展示时立即停用旧对象，避免延迟销毁的对象继续拦截鼠标。</summary>
         private static void ClearChildren(Transform root)
