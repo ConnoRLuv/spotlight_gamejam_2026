@@ -33,14 +33,24 @@ namespace SpotlightGameJam.Tests
                     new { Id = "HealCard", Count = 3 }, new { Id = "OverloadCard", Count = 3 } })
                     Assert.That(ordinary.Count(card => card.Data.cardId == entry.Id), Is.EqualTo(entry.Count), entry.Id);
                 var cybernetic = context.Cybernetic.AllCards.ToArray();
-                Assert.That(cybernetic.Length, Is.EqualTo(8));
-                foreach (var entry in new[] { new { Id = "PrometheusBrainCard", Count = 3 }, new { Id = "PrometheusTorsoCard", Count = 1 },
-                    new { Id = "PrometheusHandsCard", Count = 3 }, new { Id = "PrometheusLegsCard", Count = 1 } })
-                    Assert.That(cybernetic.Count(card => card.Data.cardId == entry.Id), Is.EqualTo(entry.Count), entry.Id);
+                // 场景测试牌组可切换；按真实配置核验逐种张数，避免写死旧普罗米修斯八张。
+                var configuredDeck = new SerializedObject(source).FindProperty("initialCyberneticDeck").objectReferenceValue as CyberneticDeckData;
+                Assert.That(configuredDeck, Is.Not.Null);
+                var expectedCards = configuredDeck.cybernetics.SelectMany(part => part.cards).ToArray();
+                Assert.That(cybernetic.Length, Is.EqualTo(expectedCards.Length));
+                foreach (var group in expectedCards.GroupBy(card => card))
+                    Assert.That(cybernetic.Count(card => card.Data == group.Key), Is.EqualTo(group.Count()), group.Key.cardId);
                 var buffs = new SerializedObject(source).FindProperty("runBuffs");
-                Assert.That(buffs.arraySize, Is.EqualTo(1));
-                Assert.That(buffs.GetArrayElementAtIndex(0).objectReferenceValue,
-                    Is.SameAs(AssetDatabase.LoadAssetAtPath<RunBuffData>("Assets/GameData/Buffs/Prometheus.asset")));
+                var definitions = Enumerable.Range(0, buffs.arraySize).Select(index =>
+                    buffs.GetArrayElementAtIndex(index).objectReferenceValue as RunBuffData).ToArray();
+                Assert.That(definitions.All(buff => buff && buff.Validate().Count == 0), Is.True);
+                var sets = new SerializedObject(source).FindProperty("setBonuses");
+                var setDefinitions = Enumerable.Range(0, sets.arraySize).Select(index =>
+                    sets.GetArrayElementAtIndex(index).objectReferenceValue as NewWorldSetBonusData).ToArray();
+                Assert.That(setDefinitions.All(set => set && set.Validate().Count == 0), Is.True);
+                Assert.That(definitions.Any(buff => buff.Matches(context.Run.Loadout.Owned)) ||
+                    setDefinitions.Any(set => set.requiredParts.All(part => context.Run.Loadout.Owned.Any(card => card.Data == part))),
+                    Is.True, "场景应注册当前测试牌组的组合。");
                 Assert.That(bootstrap.Run.Buffs.Active, Is.Empty, "开局仅配置组合，不自动触发。");
                 Assert.That(context.Ordinary.Hand.Count, Is.EqualTo(3));
                 Assert.That(context.Cybernetic.Hand.Count, Is.EqualTo(1));

@@ -45,6 +45,7 @@ namespace SpotlightGameJam
             // 临时 AP 在结束玩家行动时失效，不等到敌人行动之后才清除。
             context.ActionPoints.EndTurn();
             context.Run.Buffs.EndTurn();
+            context.Ordinary.RestoreTurnTransformations(); context.Cybernetic.RestoreTurnTransformations();
             context.Ordinary.RemoveTurnCards(); context.Cybernetic.RemoveTurnCards();
             context.TurnEffects.EndPlayerAction();
             if (context.TurnEffects.ExtraTurns > 0)

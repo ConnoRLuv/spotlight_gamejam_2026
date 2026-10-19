@@ -25,6 +25,123 @@ namespace SpotlightGameJam.Editor
         private static readonly Color LightGray = Gray(0.75f);
         private static readonly Color DarkGray = Gray(0.32f);
 
+        /// <summary>增量更新战斗顶栏：移除地图进度，以原比例图标和纯数值显示生命、塞勒币。</summary>
+        public static void ApplyTopBarIcons(BattleSceneReferences references)
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+                throw new InvalidOperationException("请在编辑模式更新战斗顶栏。");
+            if (references.mapProgressText)
+            {
+                var progress = references.mapProgressText.transform.parent.gameObject;
+                references.mapProgressText = null;
+                UnityEngine.Object.DestroyImmediate(progress);
+            }
+            var labels = new[] { references.healthText, references.goldText };
+            var paths = new[] { "Assets/Art/UI/Healthicon.png", "Assets/Art/UI/Goldicon.png" };
+            var displayFont = AssetDatabase.LoadAssetAtPath<Font>("Assets/Fonts/荆南俊俊体.ttf");
+            for (int i = 0; i < labels.Length; i++)
+            {
+                var label = labels[i];
+                var container = (RectTransform)label.transform.parent;
+                container.anchorMin = container.anchorMax = new Vector2(0, .5f);
+                container.pivot = new Vector2(0, .5f);
+                container.anchoredPosition = new Vector2(i == 0 ? 50 : 236, 0);
+                container.sizeDelta = new Vector2(i == 0 ? 165 : 185, 66);
+                var background = container.GetComponent<Image>();
+                if (background) { background.color = Color.clear; background.raycastTarget = false; }
+                var icon = container.Find("Icon") as RectTransform;
+                if (!icon)
+                {
+                    icon = new GameObject("Icon", typeof(RectTransform), typeof(Image)).GetComponent<RectTransform>();
+                    icon.gameObject.layer = container.gameObject.layer; icon.SetParent(container, false);
+                }
+                icon.anchorMin = icon.anchorMax = new Vector2(0, .5f); icon.pivot = new Vector2(0, .5f);
+                // 略微上移，补偿顶栏底部亮边与图标留白造成的视觉下沉。
+                icon.anchoredPosition = new Vector2(0, 6); icon.sizeDelta = new Vector2(48, 48);
+                var image = icon.GetComponent<Image>(); image.sprite = AssetDatabase.LoadAssetAtPath<Sprite>(paths[i]);
+                if (!image.sprite) throw new InvalidOperationException("缺少顶栏图标：" + paths[i]);
+                image.color = Color.white; image.preserveAspect = true; image.raycastTarget = false;
+                var rect = label.rectTransform; rect.anchorMin = Vector2.zero; rect.anchorMax = Vector2.one;
+                rect.offsetMin = new Vector2(60, 6); rect.offsetMax = new Vector2(-4, 6);
+                if (displayFont) label.font = displayFont;
+                label.fontSize = 28; label.resizeTextForBestFit = true; label.resizeTextMinSize = 22; label.resizeTextMaxSize = 28;
+                label.alignment = TextAnchor.MiddleLeft; label.color = Color.white; label.raycastTarget = false;
+                label.text = i == 0 ? "100" : "0";
+            }
+            EditorUtility.SetDirty(references);
+        }
+
+        /// <summary>增量将原血条、理智占位区域改为资源条，保留原对象、文字引用和立绘位置。</summary>
+        public static void ApplyResourceBars(BattleSceneReferences references)
+        {
+            if (EditorApplication.isPlayingOrWillChangePlaymode)
+                throw new InvalidOperationException("请在编辑模式更新资源条。");
+            var healthColor = (Color)new Color32(239, 78, 112, 255);
+            references.playerHealthFill = MakeResourceFill(references.playerHealthText, healthColor, "100/100");
+            references.enemyHealthFill = MakeResourceFill(references.enemyHealthText, healthColor, "9999/9999");
+            references.playerSanityFill = MakeResourceFill(references.sanityText, new Color32(142, 116, 244, 255), "理智 50/50");
+            references.playerShieldText = MakeShieldBadge(references.playerHealthText);
+            references.enemyShieldText = MakeShieldBadge(references.enemyHealthText);
+            EditorUtility.SetDirty(references);
+        }
+
+        /// <summary>创建纯色填充与暗色底槽，文字置顶并沿用荆南俊俊体，比例由运行时资源驱动。</summary>
+        private static Image MakeResourceFill(Text label, Color color, string preview)
+        {
+            var bar = (RectTransform)label.transform.parent;
+            bar.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, 24);
+            var background = bar.GetComponent<Image>();
+            background.color = new Color(.04f, .055f, .13f, .95f); background.raycastTarget = false;
+            var border = bar.GetComponent<Outline>(); if (!border) border = bar.gameObject.AddComponent<Outline>();
+            border.effectColor = new Color(.82f, .88f, 1, .6f); border.effectDistance = new Vector2(1, -1);
+            var rect = ResourceRect(bar, "Fill");
+            rect.anchorMin = Vector2.zero; rect.anchorMax = Vector2.one; rect.offsetMin = rect.offsetMax = Vector2.zero;
+            rect.SetAsFirstSibling();
+            var fill = rect.GetComponent<Image>(); if (!fill) fill = rect.gameObject.AddComponent<Image>();
+            fill.color = color; fill.raycastTarget = false;
+            StyleResourceText(label); label.text = preview; label.transform.SetAsLastSibling();
+            return fill;
+        }
+
+        /// <summary>护盾没有配置上限，蓝色数值条紧贴血条右侧；零护盾时整条隐藏。</summary>
+        private static Text MakeShieldBadge(Text healthLabel)
+        {
+            var rect = ResourceRect(healthLabel.transform.parent, "ShieldBadge");
+            rect.anchorMin = rect.anchorMax = new Vector2(1, .5f); rect.pivot = new Vector2(0, .5f);
+            rect.anchoredPosition = Vector2.zero; rect.sizeDelta = new Vector2(96, 24);
+            var image = rect.GetComponent<Image>(); if (!image) image = rect.gameObject.AddComponent<Image>();
+            image.color = new Color32(92, 181, 255, 255); image.raycastTarget = false;
+            var textRect = ResourceRect(rect, "Value");
+            var label = textRect.GetComponent<Text>(); if (!label) label = textRect.gameObject.AddComponent<Text>();
+            StyleResourceText(label); label.text = "护盾 0"; rect.gameObject.SetActive(false);
+            return label;
+        }
+
+        /// <summary>按名称复用局部子节点，重复执行资源条构建不会产生重复对象。</summary>
+        private static RectTransform ResourceRect(Transform parent, string name)
+        {
+            var rect = parent.Find(name) as RectTransform;
+            if (!rect)
+            {
+                rect = new GameObject(name, typeof(RectTransform)).GetComponent<RectTransform>();
+                rect.gameObject.layer = parent.gameObject.layer; rect.SetParent(parent, false);
+            }
+            return rect;
+        }
+
+        /// <summary>统一资源数值文字，白字配暗色阴影以兼顾填充和空槽上的可读性。</summary>
+        private static void StyleResourceText(Text label)
+        {
+            var rect = label.rectTransform; rect.anchorMin = Vector2.zero; rect.anchorMax = Vector2.one;
+            rect.offsetMin = new Vector2(3, 0); rect.offsetMax = new Vector2(-3, 0);
+            label.font = AssetDatabase.LoadAssetAtPath<Font>("Assets/Fonts/荆南俊俊体.ttf");
+            label.fontStyle = FontStyle.Normal;
+            label.fontSize = 20; label.resizeTextForBestFit = true; label.resizeTextMinSize = 16; label.resizeTextMaxSize = 20;
+            label.color = Color.white; label.alignment = TextAnchor.MiddleCenter; label.raycastTarget = false;
+            var shadow = label.GetComponent<Shadow>(); if (!shadow) shadow = label.gameObject.AddComponent<Shadow>();
+            shadow.effectColor = new Color(.02f, .025f, .08f, .9f); shadow.effectDistance = new Vector2(1, -1);
+        }
+
         /// <summary>创建并保存 BattleScene；已有文件或未保存场景时停止，保护现场。</summary>
         [MenuItem("Spotlight/Battle Scene/Create From Wireframe")]
         public static void CreateScene()
@@ -79,8 +196,7 @@ namespace SpotlightGameJam.Editor
                 "Label", "生命值", 18, Color.white, font);
             references.goldText = Label(Panel(header.transform, "Gold", new Rect(186, 22, 112, 55), DarkGray, true),
                 "Label", "塞勒币", 18, Color.white, font);
-            references.mapProgressText = Label(Panel(header.transform, "MapProgress", new Rect(1253, 22, 548, 55), DarkGray, true),
-                "Label", "地图进度", 18, Color.white, font);
+            ApplyTopBarIcons(references);
             references.settingsButton = Button(header.transform, "SettingsButton", new Rect(1820, 22, 55, 55),
                 "设置", 24, Gray(0.4f), font, true);
 
@@ -124,9 +240,9 @@ namespace SpotlightGameJam.Editor
             references.endTurnButton = Button(bottom, "EndTurnButton", new Rect(1565, 845, 233, 78),
                 "结束回合", 28, DarkGray, font);
             references.drawPileButton = Button(bottom, "DrawPileButton", new Rect(55, 952, 80, 81),
-                "抽牌堆", 18, Gray(0.59f), font);
+                string.Empty, 18, Gray(0.59f), font);
             references.discardPileButton = Button(bottom, "DiscardPileButton", new Rect(1795, 952, 80, 81),
-                "弃牌堆", 18, Gray(0.59f), font);
+                string.Empty, 18, Gray(0.59f), font);
 
             new GameObject("EventSystem", typeof(EventSystem), typeof(StandaloneInputModule));
             // 细边框最后绘制但不拦截点击。
@@ -135,6 +251,7 @@ namespace SpotlightGameJam.Editor
             Panel(frame, "BorderLeft", new Rect(4, 3, 1, 1082), DarkGray);
             Panel(frame, "BorderRight", new Rect(1923, 3, 1, 1082), DarkGray);
 
+            ApplyResourceBars(references);
             if (!EditorSceneManager.SaveScene(scene, ScenePath)) throw new IOException("保存 BattleScene 失败。");
             Selection.activeGameObject = canvasObject;
             Debug.Log("BattleScene 已按线框图生成。按钮保留绑定入口，悬停说明已可用。");
@@ -150,8 +267,12 @@ namespace SpotlightGameJam.Editor
             if (!Camera.main || !UnityEngine.Object.FindObjectOfType<EventSystem>())
                 throw new InvalidOperationException("缺少主相机或 EventSystem。");
             foreach (var field in typeof(BattleSceneReferences).GetFields())
+            {
+                // 地图进度已从战斗顶栏移除；旧序列化字段仅保留兼容，不再是必需控件。
+                if (field.Name == nameof(BattleSceneReferences.mapProgressText)) continue;
                 if (field.GetValue(references) is UnityEngine.Object value && !value || field.GetValue(references) == null)
                     throw new InvalidOperationException("缺少 UI 引用：" + field.Name);
+            }
 
             var objects = SceneManager.GetActiveScene().GetRootGameObjects();
             var count = 0;

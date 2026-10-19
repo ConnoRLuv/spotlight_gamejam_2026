@@ -25,6 +25,8 @@ namespace SpotlightGameJam.UI
         [SerializeField] private Button cancelChoiceButton;
         [SerializeField] private Text statusText;
         [SerializeField] private Text[] durabilityTexts;
+        [SerializeField] private Text drawPileCount;
+        [SerializeField] private Text discardPileCount;
         [SerializeField] private DiscardPanel discardPanel;
 
         [SerializeField] private NewWorldBrainPanel brainPanel;
@@ -32,12 +34,16 @@ namespace SpotlightGameJam.UI
         [SerializeField] private CyberneticEquipmentSlot[] equipmentSlots = new CyberneticEquipmentSlot[0];
         private readonly List<CardView> handViews = new List<CardView>();
         private readonly List<CardView> choiceViews = new List<CardView>();
+        private HandCardDragController handDrag;
+        private HandCardLayout handLayout;
         private BattleController battle;
         private bool cybernetic;
         private CardInstance pendingCard;
-        private float lastViewportHeight = -1;
+        private readonly Vector3[] handTabCorners = new Vector3[4];
         public BattleController Battle => battle;
-        public bool IsChoosing => (choicePanel && choicePanel.activeSelf) || (brainPanel && brainPanel.IsOpen);
+        public bool IsChoosing => (scene && scene.settingsPanel && scene.settingsPanel.IsOpen) ||
+            (choicePanel && choicePanel.activeSelf) || (drawPilePanel && drawPilePanel.IsReordering) ||
+            (discardPanel && discardPanel.IsSelecting) || (handDrag && handDrag.IsDragging);
         public CardInstance PendingCard => pendingCard;
 
         private void OnEnable()
@@ -66,6 +72,7 @@ namespace SpotlightGameJam.UI
             if (enemyButton) enemyButton.onClick.RemoveListener(ChooseEnemy);
             if (cancelChoiceButton) cancelChoiceButton.onClick.RemoveListener(CancelSelection);
             CancelSelection(); ClearViews(handViews);
+            if (handLayout) handLayout.SetCards(handViews);
         }
 
         private void Update()
@@ -75,10 +82,9 @@ namespace SpotlightGameJam.UI
         }
         private void LateUpdate()
         {
-            // 窗口尺寸改变时只调整现有展示，不重新生成整手牌。
-            if (handScroll && handScroll.viewport && Mathf.Abs(lastViewportHeight - handScroll.viewport.rect.height) > 0.1f)
-                UpdateCardScale();
-            if (IsChoosing) UpdateChoiceLayout();
+            // 页签或窗口尺寸变化时更新可用区域，独立布局组件负责检测宽高并补间。
+            if (handScroll && handScroll.viewport) FitHandViewport();
+            if (choicePanel && choicePanel.activeSelf) UpdateChoiceLayout();
         }
         /// <summary>选牌窗口限制在画布内，按视口宽度调整列数，卡牌始终由裁剪列表承载。</summary>
         private void UpdateChoiceLayout()
@@ -101,14 +107,34 @@ namespace SpotlightGameJam.UI
                 if (grid.constraintCount != columns) grid.constraintCount = columns;
             }
         }
-        /// <summary>根据手牌视口高度等比缩放现有卡面，并请求重新布局。</summary>
+        /// <summary>沿用真实页签边界，交给单页布局等比缩放并预留悬停空间。</summary>
         private void UpdateCardScale()
         {
             if (!handScroll || !handScroll.viewport) return;
-            lastViewportHeight = handScroll.viewport.rect.height;
-            var scale = Mathf.Clamp((lastViewportHeight - 4) / 210f, 0.1f, 6f / 7f);
-            foreach (var view in handViews) if (view) view.transform.localScale = Vector3.one * scale;
-            LayoutRebuilder.MarkLayoutForRebuild(cardsRoot);
+            FitHandViewport();
+            if (handLayout) handLayout.RefreshLayout();
+        }
+
+        /// <summary>按普通牌和义体牌页签的实际位置预留间隔，避免固定顶部留白浪费空间或遮住页签。</summary>
+        private void FitHandViewport()
+        {
+            var viewport = handScroll.viewport;
+            var parent = viewport.parent as RectTransform;
+            if (!parent) return;
+            float top = parent.rect.yMax - 8;
+            top = GetHandTabBottom(ordinaryTab, parent, top);
+            top = GetHandTabBottom(cyberneticTab, parent, top);
+            var offset = viewport.offsetMax;
+            float inset = Mathf.Max(8, parent.rect.yMax - top);
+            if (!Mathf.Approximately(offset.y, -inset)) viewport.offsetMax = new Vector2(offset.x, -inset);
+        }
+
+        /// <summary>把页签下沿换算到视口父节点空间，兼容按钮自身缩放和不同分辨率。</summary>
+        private float GetHandTabBottom(Button tab, RectTransform parent, float currentTop)
+        {
+            if (!tab || !tab.gameObject.activeInHierarchy) return currentTop;
+            ((RectTransform)tab.transform).GetWorldCorners(handTabCorners);
+            return Mathf.Min(currentTop, parent.InverseTransformPoint(handTabCorners[0]).y - 4);
         }
 
         /// <summary>解除旧战斗订阅，绑定新战斗状态并刷新界面。</summary>
@@ -118,6 +144,7 @@ namespace SpotlightGameJam.UI
             battle.Context.Changed += OnBattleChanged;
             battle.Context.Run.GoldChanged += OnGoldChanged;
             battle.Context.Player.Changed += OnPlayerHealthChanged;
+            foreach (var enemy in battle.Context.Enemies) enemy.Changed += OnEnemyResourcesChanged;
             if (discardPanel) discardPanel.Bind(battle.Context);
 
             if (drawPilePanel) drawPilePanel.Bind(battle.Context);
@@ -126,11 +153,13 @@ namespace SpotlightGameJam.UI
         /// <summary>解除战斗事件订阅并清空关联展示，避免引用上一场战斗。</summary>
         private void Unbind()
         {
+            if (handDrag) handDrag.CancelDrag();
             if (battle != null)
             {
                 battle.Context.Changed -= OnBattleChanged;
                 battle.Context.Run.GoldChanged -= OnGoldChanged;
                 battle.Context.Player.Changed -= OnPlayerHealthChanged;
+                foreach (var enemy in battle.Context.Enemies) enemy.Changed -= OnEnemyResourcesChanged;
             }
             if (discardPanel) discardPanel.Bind(null);
 
@@ -148,14 +177,44 @@ namespace SpotlightGameJam.UI
         }
 
         /// <summary>地图或商店改变塞勒币时即时更新顶部余额，无需推进战斗或重新绑定。</summary>
-        private void OnGoldChanged(int amount) { if (scene && scene.goldText) scene.goldText.text = "塞勒币 " + amount; }
+        private void OnGoldChanged(int amount) { if (scene && scene.goldText) scene.goldText.text = amount.ToString(); }
 
-        /// <summary>商店恢复生命时即时同步露出的工具栏和血条，不重建手牌或执行回合逻辑。</summary>
+        /// <summary>生命、理智、护盾变化时即时同步状态条和顶栏，不重建手牌或执行回合逻辑。</summary>
         private void OnPlayerHealthChanged(CombatantState player)
         {
             if (!scene) return;
-            if (scene.healthText) scene.healthText.text = "生命 " + player.Health;
-            if (scene.playerHealthText) scene.playerHealthText.text = player.Health + "/" + player.MaxHealth + "  护盾 " + player.Shield;
+            if (scene.healthText) scene.healthText.text = player.Health.ToString();
+            if (scene.playerHealthText) scene.playerHealthText.text = player.Health + "/" + player.MaxHealth;
+            if (scene.sanityText) scene.sanityText.text = "理智 " + player.Sanity + "/" + player.MaxSanity;
+            SetResourceFill(scene.playerHealthFill, player.Health, player.MaxHealth);
+            SetResourceFill(scene.playerSanityFill, player.Sanity, player.MaxSanity);
+            SetShieldValue(scene.playerShieldText, player.Shield);
+        }
+
+        /// <summary>仅展示当前首位敌人的生命与护盾，复用原单敌人立绘区域；绑定切换时解除旧订阅。</summary>
+        private void OnEnemyResourcesChanged(CombatantState enemy)
+        {
+            if (!scene || battle == null || enemy != battle.Context.Enemies.FirstOrDefault()) return;
+            if (scene.enemyHealthText) scene.enemyHealthText.text = enemy.Health + "/" + enemy.MaxHealth;
+            SetResourceFill(scene.enemyHealthFill, enemy.Health, enemy.MaxHealth);
+            SetShieldValue(scene.enemyShieldText, enemy.Shield);
+        }
+
+        /// <summary>通过锚点按比例填充纯色条，零值完全清空，不依赖额外图片或人为设定护盾上限。</summary>
+        private static void SetResourceFill(Image fill, int current, int maximum)
+        {
+            if (!fill) return;
+            var max = fill.rectTransform.anchorMax;
+            max.x = maximum > 0 ? Mathf.Clamp01((float)current / maximum) : 0;
+            fill.rectTransform.anchorMax = max;
+        }
+
+        /// <summary>护盾按真实数量显示蓝色标记，无护盾时隐藏整个标记。</summary>
+        private static void SetShieldValue(Text label, int amount)
+        {
+            if (!label) return;
+            label.text = "护盾 " + amount;
+            label.transform.parent.gameObject.SetActive(amount > 0);
         }
 
         /// <summary>外部只读界面关闭后同步当前卡面和义体耐久，不执行战斗指令。</summary>
@@ -198,10 +257,15 @@ namespace SpotlightGameJam.UI
                     (card.Source == null || !battle.Context.Run.Loadout.Contains(card.Source) || card.Source.Durability <= 0 ||
                     !battle.Context.Usage.CanUse(card.Source.Data.slot))) { SetStatus("来源义体当前不可用。"); return; }
                 if (!battle.Context.CanPayCardCost(card)) { SetStatus("资源不足，无法使用该牌。"); return; }
-                if (!brainPanel) { SetStatus("缺少牌堆调整面板。"); return; }
+                if (!drawPilePanel) { SetStatus("缺少抽牌堆面板。"); return; }
                 ClosePilePanels(0);
-                pendingCard = card;
-                brainPanel.Open(battle, card, OnReorderFinished);
+                // 以当前完整顺序成功使用脑机，费用、耐久、次数与套装出牌记录只在这里结算一次。
+                var context = battle.Context;
+                var initialOrder = context.Ordinary.GetDrawPileOrder().Concat(context.Cybernetic.GetDrawPileOrder()).ToArray();
+                var result = battle.TryPlayRequest(new CardPlayRequest(card, reorder: initialOrder));
+                Report(result);
+                if (!result.Success || context.IsFinished) return;
+                drawPilePanel.OpenReorder(context, OnDrawPileReorderFinished);
                 Refresh();
                 return;
             }
@@ -215,6 +279,15 @@ namespace SpotlightGameJam.UI
                 // 控制器决定候选来源，既支持脑机查看牌堆，也支持改造当前基本手牌。
                 var choices = battle.GetCardChoices(card);
                 if (choices.Count == 0) { SetStatus("当前没有可选择的卡牌。"); return; }
+                if (card.Data.effects.Any(effect => effect.ChoiceUsesDiscardPile))
+                {
+                    if (!discardPanel) { SetStatus("缺少弃牌面板。"); return; }
+                    ClosePilePanels(0);
+                    pendingCard = card;
+                    discardPanel.OpenSelection(context, battle.GetCardChoiceTitle(card),
+                        value => battle != null && battle.GetCardChoices(card).Contains(value), OnDiscardChoiceFinished);
+                    Refresh(); return;
+                }
                 pendingCard = card; choicePanel.SetActive(true);
                 if (choiceTitle) choiceTitle.text = battle.GetCardChoiceTitle(card);
                 if (choiceHint) choiceHint.text = battle.GetCardChoicePrompt(card);
@@ -250,15 +323,29 @@ namespace SpotlightGameJam.UI
             CancelSelection();
             Report(battle.TryPlayRequest(new CardPlayRequest(card, choiceId: choice.Id)));
         }
-        /// <summary>接收牌堆重排结果，清理待用卡并刷新界面。</summary>
-        private void OnReorderFinished(CardPlayResult result) { pendingCard = null; Report(result); }
+        /// <summary>排序关闭或被战斗切换终止后恢复界面，不再次提交出牌或支付费用。</summary>
+        private void OnDrawPileReorderFinished(bool committed) { if (battle != null) Refresh(); }
+
+        /// <summary>弃牌面板只提供选择；确认后统一提交出牌请求，取消时不调用支付入口。</summary>
+        private void OnDiscardChoiceFinished(CardInstance choice)
+        {
+            var card = pendingCard;
+            pendingCard = null;
+            if (discardPanel) discardPanel.Hide(0);
+            if (battle == null) return;
+            if (choice == null || card == null) { Refresh(); return; }
+            Report(battle.TryPlayRequest(new CardPlayRequest(card, choiceId: choice.Id)));
+        }
 
         /// <summary>取消仅修改展示，不修改牌堆或战斗资源。</summary>
         public void CancelSelection()
         {
+            if (handDrag) handDrag.CancelDrag();
             pendingCard = null;
             if (choicePanel) choicePanel.SetActive(false);
             if (brainPanel) brainPanel.Close();
+            if (drawPilePanel && drawPilePanel.IsReordering) drawPilePanel.Hide(0);
+            if (discardPanel && discardPanel.IsSelecting) discardPanel.Hide(0);
             ClearViews(choiceViews);
             if (battle != null) Refresh();
         }
@@ -279,29 +366,40 @@ namespace SpotlightGameJam.UI
         /// <summary>单次操作结束时刷新；不依据通知期间的结算锁永久禁用按钮。</summary>
         private void Refresh()
         {
-            if (battle == null) return;
+            // 父画布正在停用时，子面板的取消回调仍可能到达；重新启用时 Bind 会统一刷新。
+            if (battle == null || !isActiveAndEnabled || !cardsRoot || !cardsRoot.gameObject.activeInHierarchy) return;
+            // 战斗变化或切页先撤销拖拽，再重建手牌；浮动卡不能遗留在黑幕中。
+            if (handDrag) handDrag.CancelDrag();
             var context = battle.Context;
             bool canAct = context.State == BattleState.PlayerAction && !context.IsFinished && !IsChoosing;
-            if (IsChoosing || context.IsFinished) ClosePilePanels(0);
+            if (context.IsFinished) ClosePilePanels(0);
+            else if (IsChoosing)
+            {
+                if (drawPilePanel && !drawPilePanel.IsReordering) drawPilePanel.Hide(0);
+                if (discardPanel && !discardPanel.IsSelecting) discardPanel.Hide(0);
+            }
             foreach (var slot in equipmentSlots)
             {
                 if (!slot) continue;
                 slot.Refresh(context);
                 if (IsChoosing) slot.HideTooltip();
             }
-            scene.healthText.text = "生命 " + context.Player.Health;
-            scene.goldText.text = "塞勒币 " + context.Run.Gold;
-            scene.playerHealthText.text = context.Player.Health + "/" + context.Player.MaxHealth + "  护盾 " + context.Player.Shield;
-            scene.sanityText.text = "理智值 " + context.Player.Sanity + "/" + context.Player.MaxSanity;
+            OnPlayerHealthChanged(context.Player);
+            scene.goldText.text = context.Run.Gold.ToString();
             var enemy = context.Enemies.FirstOrDefault();
-            if (enemy != null) { scene.enemyHealthText.text = enemy.Health + "/" + enemy.MaxHealth; scene.enemyNameText.text = "训练守卫"; }
+            if (enemy != null) { OnEnemyResourcesChanged(enemy); scene.enemyNameText.text = "训练守卫"; }
             scene.actionPointsText.text = "行动点 " + context.ActionPoints.Total;
             scene.endTurnButton.interactable = canAct;
             ordinaryTab.interactable = !IsChoosing; cyberneticTab.interactable = !IsChoosing;
             ordinaryTab.GetComponentInChildren<Text>().text = "普通牌 " + context.Ordinary.Hand.Count + "/13";
             cyberneticTab.GetComponentInChildren<Text>().text = "义体牌 " + context.Cybernetic.Hand.Count + "/5";
-            scene.drawPileButton.GetComponentInChildren<Text>().text = "抽牌堆\n" + context.Ordinary.DrawPile.Count + " / " + context.Cybernetic.DrawPile.Count;
-            scene.discardPileButton.GetComponentInChildren<Text>().text = "弃牌堆\n" + context.Ordinary.DiscardPile.Count + " / " + context.Cybernetic.DiscardPile.Count;
+            // 旧 Label 保持清空，数字单独填入美术圆圈，合计两类真实牌堆而不随手牌页签切换。
+            scene.drawPileButton.GetComponentInChildren<Text>().text = string.Empty;
+            scene.discardPileButton.GetComponentInChildren<Text>().text = string.Empty;
+            if (!drawPileCount) drawPileCount = EnsurePileCount(scene.drawPileButton, true);
+            if (!discardPileCount) discardPileCount = EnsurePileCount(scene.discardPileButton, false);
+            drawPileCount.text = (context.Ordinary.DrawPile.Count + context.Cybernetic.DrawPile.Count).ToString();
+            discardPileCount.text = (context.Ordinary.DiscardPile.Count + context.Cybernetic.DiscardPile.Count).ToString();
             conversionButton.gameObject.SetActive(context.TurnEffects.ConversionEnabled && !context.IsFinished);
             conversionButton.interactable = canAct && context.ActionPoints.Total >= 1 && context.Ordinary.CanAddToHand();
             for (int i = 0; i < durabilityTexts.Length; i++)
@@ -312,18 +410,89 @@ namespace SpotlightGameJam.UI
                     new[] { "脑机", "躯干", "手部", "腿部" }[i] + "\n耐久 " + source.Durability + "/" + source.Data.maxDurability
                     + "\n使用 " + context.Usage.GetUses(slot) + "/3";
             }
-            ClearViews(handViews);
-            foreach (var card in (cybernetic ? context.Cybernetic : context.Ordinary).Hand.Cards)
+            if (!handLayout) handLayout = cardsRoot.GetComponent<HandCardLayout>();
+            if (!handLayout) handLayout = cardsRoot.gameObject.AddComponent<HandCardLayout>();
+            handLayout.Configure(handScroll);
+            if (!handDrag) handDrag = gameObject.AddComponent<HandCardDragController>();
+            handDrag.Configure(cardsRoot, handScroll, scene.handArea, GetHandDragTarget, PlayDraggedCard, BeginHandDrag, GetHandDragHighlights);
+            var wanted = (cybernetic ? context.Cybernetic : context.Ordinary).Hand.Cards;
+            foreach (var removed in handViews.Where(view => !view || !wanted.Contains(view.Instance)).ToArray())
             {
-                var view = Instantiate(catalog.Find(card.Data), cardsRoot);
-                // 手牌区保留参考图位置；缩放卡牌以为标签栏留出空间。
-                view.transform.localScale = Vector3.one * (6f / 7f);
-                view.BindForBattle(card, context); view.SetInteractable(canAct); view.Selected += SelectCard;
-                handViews.Add(view);
+                handViews.Remove(removed);
+                if (!removed) continue;
+                removed.Selected -= SelectCard; removed.gameObject.SetActive(false); Destroy(removed.gameObject);
             }
-            if (handScroll) handScroll.horizontalNormalizedPosition = 0;
+            var ordered = new List<CardView>(wanted.Count);
+            foreach (var card in wanted)
+            {
+                var view = handViews.Find(value => value.Instance == card);
+                if (!view)
+                {
+                    view = Instantiate(catalog.Find(card.Data), cardsRoot); view.Selected += SelectCard;
+                }
+                view.BindForBattle(card, context); view.SetInteractable(canAct); ordered.Add(view);
+                handDrag.Attach(view);
+            }
+            handViews.Clear(); handViews.AddRange(ordered);
+            handLayout.SetCards(handViews);
             UpdateCardScale();
             if (context.IsFinished) SetStatus(context.State == BattleState.Victory ? "战斗胜利" : "战斗失败");
+        }
+
+        /// <summary>按真实卡牌目标配置区分敌我，自动兼容本回合被转换为攻击牌的普通手牌。</summary>
+        private RectTransform GetHandDragTarget(CardView view)
+        {
+            if (!isActiveAndEnabled || battle == null || IsChoosing || battle.Context.State != BattleState.PlayerAction ||
+                battle.Context.IsFinished || view.Instance == null || view.Data.locksInHand) return null;
+            var context = battle.Context; var card = view.Instance;
+            if (!context.Ordinary.Hand.Contains(card) && !context.Cybernetic.Hand.Contains(card)) return null;
+            bool enemy = card.Data.targetType == CardTargetType.SingleEnemy || card.Data.targetType == CardTargetType.AllEnemies;
+            if (enemy && !context.Enemies.Any(value => value.IsAlive)) return null;
+            var playTarget = card.Data.targetType == CardTargetType.SingleEnemy ? context.Enemies.FirstOrDefault(value => value.IsAlive) : null;
+            if (!battle.CanStartPlay(card, playTarget)) return null;
+            return enemy ? scene.enemyPortrait.rectTransform : scene.playerPortrait.rectTransform;
+        }
+
+        /// <summary>开始拖动时清除旧攻击目标并关闭只读牌堆，不刷新或销毁正在拖动的手牌。</summary>
+        private void BeginHandDrag() { pendingCard = null; ClosePilePanels(0); }
+
+        /// <summary>目标对应的血条、理智条及护盾随原立绘高亮；非目标角色保持黑幕遮挡。</summary>
+        private IEnumerable<RectTransform> GetHandDragHighlights(CardInstance card)
+        {
+            bool enemy = card.Data.targetType == CardTargetType.SingleEnemy || card.Data.targetType == CardTargetType.AllEnemies;
+            var health = enemy ? scene.enemyHealthText : scene.playerHealthText;
+            var shield = enemy ? scene.enemyShieldText : scene.playerShieldText;
+            if (health) yield return health.transform.parent as RectTransform;
+            if (shield) yield return shield.transform.parent as RectTransform;
+            if (!enemy && scene.sanityText) yield return scene.sanityText.transform.parent as RectTransform;
+        }
+
+        /// <summary>有效放置复用权威出牌入口；交互义体继续由既有选牌或排序面板完成。</summary>
+        private void PlayDraggedCard(CardInstance card)
+        {
+            if (battle == null || IsChoosing || battle.Context.State != BattleState.PlayerAction || battle.Context.IsFinished) return;
+            if (card.Data.targetType == CardTargetType.SingleEnemy)
+                Report(battle.TryPlay(card, battle.Context.Enemies.FirstOrDefault(enemy => enemy.IsAlive)));
+            else SelectCard(card);
+        }
+
+        /// <summary>兼容已有场景，在图标白色圆圈内补充独立数量文本，不叠加名称或拦截按钮输入。</summary>
+        private Text EnsurePileCount(Button button, bool draw)
+        {
+            var child = button.transform.Find("Count");
+            if (child) return child.GetComponent<Text>();
+            var root = new GameObject("Count", typeof(RectTransform), typeof(Text));
+            root.layer = button.gameObject.layer; root.transform.SetParent(button.transform, false);
+            var text = root.GetComponent<Text>(); var label = button.transform.Find("Label")?.GetComponent<Text>();
+            text.font = label ? label.font : scene.actionPointsText.font;
+            text.fontSize = 22; text.fontStyle = FontStyle.Bold; text.color = new Color(.04f, .05f, .1f);
+            text.alignment = TextAnchor.MiddleCenter; text.raycastTarget = false;
+            text.resizeTextForBestFit = true; text.resizeTextMinSize = 12; text.resizeTextMaxSize = 22;
+            var rect = text.rectTransform;
+            // 两张原图的数量圆圈分别位于右下和左下，按原尺寸的圆心定位，保持美术原比例。
+            rect.anchorMin = rect.anchorMax = draw ? new Vector2(77f / 102f, 38f / 112f) : new Vector2(21f / 98f, 39f / 102f);
+            rect.pivot = new Vector2(.5f, .5f); rect.anchoredPosition = Vector2.zero; rect.sizeDelta = new Vector2(32, 32);
+            return text;
         }
 
         /// <summary>停用并销毁现有卡牌展示对象，清空展示集合。</summary>

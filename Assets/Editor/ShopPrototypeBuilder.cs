@@ -49,6 +49,8 @@ namespace SpotlightGameJam.Editor
                 if (!wrapper) wrapper = Box(hud.transform, "ShopPrototypeTest", new Rect(0, 0, 1920, 1080), null);
                 var entry = wrapper.GetComponent<ShopPrototypeTestEntry>();
                 if (!entry) entry = wrapper.gameObject.AddComponent<ShopPrototypeTestEntry>();
+                // 只有显式运行测试构建菜单才重新启用入口；正式场景默认停用并移除预留按钮。
+                entry.enabled = true;
                 var controls = hud.transform.Find("BattleLayout_16x9/PilePanelTestControls");
                 var button = controls ? controls.Find("TestShopButton") : null;
                 if (!button) button = wrapper.Find("TestShopButton");

@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1bf10ac49ae588d45a9b82a1a9490368, type: 3}
+  m_Name: NewWorldLegsCard
+  m_EditorClassIdentifier: 
+  cardId: NewWorldLegsCard
+  cardName: "\u65B0\u4E16\u754C\xB7\u817F\u90E8"
+  artwork: {fileID: 21300000, guid: a3793d97a68b24e7f96775074cb939e0, type: 3}
+  description: "\u83B7\u5F97\u4E00\u4E2A\u989D\u5916\u7684\u884C\u52A8\u56DE\u5408\u3002"
+  cost: 0
+  category: 2
+  sanityCost: 10
+  requiresEquippedCybernetic: 0
+  effects:
+  - {fileID: 11400000, guid: 51ce01495c1737649a40e722309b32aa, type: 2}
+  locksInHand: 0
+  cardType: 2
+  targetType: 1

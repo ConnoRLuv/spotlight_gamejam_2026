@@ -20,6 +20,8 @@ namespace SpotlightGameJam
         public virtual bool RequiresTarget => false;
         /// <summary>需要选牌时，普通 TryPlay 在支付前返回 ChoiceRequired。</summary>
         public virtual bool RequiresChoice => false;
+        /// <summary>在现有弃牌面板浏览两套弃牌并选牌；默认继续使用通用候选窗口。</summary>
+        public virtual bool ChoiceUsesDiscardPile => false;
         /// <summary>需要重排抽牌堆时返回 true；重排结果经 CardPlayRequest.Reorder 提交。</summary>
         public virtual bool RequiresReorder => false;
         public virtual string ReorderTitle => "调整抽牌堆顺序";

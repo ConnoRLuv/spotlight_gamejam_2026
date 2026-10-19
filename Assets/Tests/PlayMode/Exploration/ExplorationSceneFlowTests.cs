@@ -23,6 +23,7 @@ namespace SpotlightGameJam.Tests
         {
             originalBackground = Application.runInBackground; originalTimeScale = Time.timeScale;
             Application.runInBackground = true; Time.timeScale = 1;
+            SceneManager.sceneLoaded += DisableShopTestFunding;
             if (AdventureSession.Instance) UnityEngine.Object.Destroy(AdventureSession.Instance.gameObject);
             yield return null;
 #if UNITY_EDITOR
@@ -37,9 +38,17 @@ namespace SpotlightGameJam.Tests
         [UnityTearDown]
         public IEnumerator TearDown()
         {
+            SceneManager.sceneLoaded -= DisableShopTestFunding;
             if (AdventureSession.Instance) UnityEngine.Object.Destroy(AdventureSession.Instance.gameObject);
             yield return null;
             Time.timeScale = originalTimeScale; Application.runInBackground = originalBackground;
+        }
+
+        /// <summary>资源持久化测试隔离旧商店入口的 9999 测试补助，仅停用运行时组件，不修改场景。</summary>
+        private static void DisableShopTestFunding(Scene scene, LoadSceneMode mode)
+        {
+            foreach (var entry in scene.GetRootGameObjects().SelectMany(root => root.GetComponentsInChildren<ShopPrototypeTestEntry>(true)))
+                entry.enabled = false;
         }
         /// <summary>原制式四部位应带入十二张义体牌。</summary>
         [UnityTest] public IEnumerator OriginalDeckReachesBattle() => VerifySelection(new[]{0,1,2,3},12);
@@ -51,11 +60,71 @@ namespace SpotlightGameJam.Tests
         [UnityTest] public IEnumerator PartialDeckReachesBattle() => VerifySelection(new[]{4},3);
         /// <summary>空义体牌组可以进入战斗，不会回退到场景预设牌组。</summary>
         [UnityTest] public IEnumerator EmptyDeckReachesBattle() => VerifySelection(Array.Empty<int>(),0);
+        /// <summary>新世界四部位按三张一组带入十二张牌，战斗不能被场景预设覆盖。</summary>
+        [UnityTest] public IEnumerator NewWorldDeckReachesBattle() => VerifySelection(new[]{8,9,10,11},12);
+        /// <summary>复仇女神按三、三、三、二带入十一张牌，不被场景中的普罗米修斯默认覆盖。</summary>
+        [UnityTest] public IEnumerator NemesisDeckReachesBattle() => VerifySelection(new[]{12,13,14,15},11);
+
+        /// <summary>真实弃牌面板可浏览两类牌，只让攻击牌响应回收，取消不扣费，确认后一次结算。</summary>
+        [UnityTest]
+        public IEnumerator NemesisHandsCanBrowseCancelAndRecoverThroughHud()
+        {
+            yield return VerifySelection(new[] { 12, 13, 14, 15 }, 11);
+            var hud = UnityEngine.Object.FindObjectOfType<BattleHUD>(); var context = hud.Battle.Context;
+            var hands = context.Cybernetic.Hand.Cards.Concat(context.Cybernetic.DrawPile.Cards)
+                .First(card => card.Source.Data.slot == CyberneticSlot.Hands);
+            if (!context.Cybernetic.Hand.Contains(hands))
+            { context.Cybernetic.DrawPile.TryRemove(hands); context.Cybernetic.Hand.TryAdd(hands); }
+            var attack = context.Ordinary.Hand.Cards.Concat(context.Ordinary.DrawPile.Cards)
+                .First(card => card.Data.category == CardCategory.Basic && card.Data.cardType == CardType.Attack);
+            if (context.Ordinary.Hand.Contains(attack)) context.Ordinary.Discard(attack);
+            else { context.Ordinary.DrawPile.TryRemove(attack); context.Ordinary.DiscardPile.TryAdd(attack); }
+            var spare = context.Cybernetic.DrawPile.Cards.First(); context.Cybernetic.DrawPile.TryRemove(spare); context.Cybernetic.DiscardPile.TryAdd(spare);
+            var panel = Field<DiscardPanel>(hud, "discardPanel"); int sanity = context.Player.Sanity, durability = hands.Source.Durability;
+            hud.SelectCard(hands); yield return null;
+            Assert.That(panel.IsVisible, Is.True); Assert.That(panel.IsSelecting, Is.True); Assert.That(hud.IsChoosing, Is.True);
+            panel.ShowCybernetic(); Assert.That(panel.DisplayedCards, Does.Contain(spare));
+            Assert.That(panel.GetComponentsInChildren<CardView>().All(view => !view.GetComponent<Button>().interactable), Is.True);
+            panel.Close(); yield return null;
+            Assert.That(hud.IsChoosing, Is.False); Assert.That(context.Player.Sanity, Is.EqualTo(sanity)); Assert.That(hands.Source.Durability, Is.EqualTo(durability));
+            hud.SelectCard(hands); yield return null; Assert.That(panel.IsSelecting, Is.True);
+            var chosen = panel.GetComponentsInChildren<CardView>().Single(view => view.Instance == attack);
+            Click(chosen.GetComponent<Button>()); yield return null;
+            Assert.That(panel.IsVisible, Is.False); Assert.That(hud.IsChoosing, Is.False);
+            Assert.That(context.Ordinary.Hand.Contains(attack), Is.True); Assert.That(context.Player.Sanity, Is.EqualTo(sanity - 6));
+            Assert.That(hands.Source.Durability, Is.EqualTo(durability - 1));
+            hud.ShowDiscardPile(0); Assert.That(panel.IsSelecting, Is.False);
+            Assert.That(panel.GetComponentsInChildren<CardView>().All(view => !view.GetComponent<Button>().interactable), Is.True);
+        }
+
+        /// <summary>真实 HUD 使用脑机时立即结算一次，打开抽牌面板，关闭后完成并恢复操作。</summary>
+        [UnityTest]
+        public IEnumerator NewWorldBrainOpensDrawPilePaysOnceAndFinishesOnCloseThroughHud()
+        {
+            yield return VerifySelection(new[] { 8, 9, 10, 11 }, 12);
+            var hud = UnityEngine.Object.FindObjectOfType<BattleHUD>(); var context = hud.Battle.Context;
+            var brain = context.Cybernetic.Hand.Cards.Concat(context.Cybernetic.DrawPile.Cards).Concat(context.Cybernetic.DiscardPile.Cards)
+                .First(card => card.Source.Data.slot == CyberneticSlot.Brain);
+            if (!context.Cybernetic.Hand.Contains(brain))
+            { context.Cybernetic.DrawPile.TryRemove(brain); context.Cybernetic.DiscardPile.TryRemove(brain); Assert.That(context.Cybernetic.Hand.TryAdd(brain), Is.True); }
+            int sanity = context.Player.Sanity, durability = brain.Source.Durability;
+            var expectedOrdinary = context.Ordinary.GetDrawPileOrder().ToArray();
+            var expectedCybernetic = context.Cybernetic.GetDrawPileOrder().ToArray();
+            hud.SelectCard(brain); var panel = hud.GetComponentInChildren<DrawPilePanel>(true);
+            Assert.That(panel.IsVisible, Is.True, "脑机应直接打开现有抽牌堆面板。");
+            Assert.That(context.Player.Sanity, Is.EqualTo(sanity - 4)); Assert.That(brain.Source.Durability, Is.EqualTo(durability - 1));
+            Assert.That(context.Usage.CanUse(CyberneticSlot.Brain), Is.False);
+            Click(Field<Button>(panel, "closeButton")); yield return null;
+            Assert.That(context.Cybernetic.Hand.Contains(brain), Is.False); Assert.That(hud.IsChoosing, Is.False);
+            Assert.That(context.Player.Sanity, Is.EqualTo(sanity - 4)); Assert.That(brain.Source.Durability, Is.EqualTo(durability - 1));
+            Assert.That(context.Ordinary.GetDrawPileOrder(), Is.EqualTo(expectedOrdinary));
+            Assert.That(context.Cybernetic.GetDrawPileOrder(), Is.EqualTo(expectedCybernetic));
+        }
         /// <summary>选择候选并点击更换、出发，验证会话身份、牌数和玩家属性经过真实场景切换保持一致。</summary>
         private static IEnumerator VerifySelection(int[] indices,int count)
         {
             var controller = UnityEngine.Object.FindObjectOfType<StartSceneController>(); Assert.That(controller,Is.Not.Null);
-            var setup = Field<AdventureSetupData>(controller,"setup"); Assert.That(setup.availableCybernetics.Length,Is.EqualTo(8));
+            var setup = Field<AdventureSetupData>(controller,"setup"); Assert.That(setup.availableCybernetics.Length,Is.EqualTo(16));
             controller.ClearSelection();
             var selected = indices.Select(i=>setup.availableCybernetics[i]).ToArray();
             foreach (var data in selected)
@@ -92,8 +161,15 @@ namespace SpotlightGameJam.Tests
             Assert.That(AdventureSession.Instance.EncounterIndex,Is.EqualTo(1),"重复点击不能创建两个遭遇。");
         }
         /// <summary>读取场景已配置的控件引用，不为测试改变业务类的可见性。</summary>
-        private static T Field<T>(object owner,string name) where T : class =>
-            owner.GetType().GetField(name,BindingFlags.Instance|BindingFlags.NonPublic).GetValue(owner) as T;
+        private static T Field<T>(object owner,string name) where T : class
+        {
+            for (var type = owner.GetType(); type != null; type = type.BaseType)
+            {
+                var field = type.GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
+                if (field != null) return field.GetValue(owner) as T;
+            }
+            Assert.Fail("缺少字段：" + name); return null;
+        }
         /// <summary>发送真实按钮左键点击，保留 Button 对禁用和重复点击的校验。</summary>
         private static void Click(Button button)
         {

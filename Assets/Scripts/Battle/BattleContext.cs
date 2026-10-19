@@ -93,7 +93,12 @@ namespace SpotlightGameJam
         {
             if (State == state) return;
             State = state;
-            if (IsFinished) { Run.Buffs.EndBattle(); TurnEffects.Clear(); Ordinary.RemoveTurnCards(); Cybernetic.RemoveTurnCards(); }
+            if (IsFinished)
+            {
+                Run.Buffs.EndBattle(); TurnEffects.Clear();
+                Ordinary.RestoreTurnTransformations(); Cybernetic.RestoreTurnTransformations();
+                Ordinary.RemoveTurnCards(); Cybernetic.RemoveTurnCards();
+            }
             StateChanged?.Invoke(state);
         }
         /// <summary>
@@ -102,6 +107,14 @@ namespace SpotlightGameJam
         internal void NotifyChanged() => Changed?.Invoke(this);
         /// <summary>完整出牌结算后广播本次打出的牌；此时该牌已进入对应弃牌堆。</summary>
         internal void NotifyCardPlayed(CardInstance card) => CardPlayed?.Invoke(card);
+        /// <summary>实际受伤后结算复仇女神被动；主动支付、护盾全吸收和致命伤害不抽牌。</summary>
+        internal void NotifyPlayerDamaged(int healthLost, int sanityLost)
+        {
+            if (IsFinished || !Player.IsAlive || healthLost <= 0 && sanityLost <= 0 ||
+                !Run.Buffs.Has(RunBuffEffect.DrawBasicOnDamage) || !Ordinary.CanAddToHand()) return;
+            // 与普通抽牌共用空堆洗回规则，再筛选基本牌；不创建新牌，也不把功能牌误抽入手牌。
+            Ordinary.DrawBasic();
+        }
         public bool HasPhantomPain => Ordinary.Hand.Cards.Any(c => c.Data == PhantomPain);
         /// <summary>
         /// 理智归零登记持久幻痛并立即入手，满手随机弃普通牌；恢复为正数则移除当前幻痛。

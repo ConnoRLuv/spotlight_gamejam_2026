@@ -11,6 +11,8 @@ namespace SpotlightGameJam
         public bool FreeBasicCards { get; internal set; }
         public bool FreeAttackCards { get; internal set; }
         public bool OverloadApPermanent { get; internal set; }
+        // 覆盖当前玩家行动及紧随其后的敌方行动，下一玩家回合开始清除。
+        public bool RedirectEnemyDamage { get; internal set; }
         // 此项在回合刷新时保留，仅战斗结束时清除。
         public bool CyberneticsPayHealth { get; internal set; }
 
@@ -19,6 +21,7 @@ namespace SpotlightGameJam
         {
             // 承伤保护保留至敌人行动结束，而 AP 转换仅属于玩家行动阶段。
             DamageToSanityArmed = false;
+            RedirectEnemyDamage = false;
             ConversionAttack = null;
             OverloadApPermanent = false;
             FreeBasicCards = false;
@@ -30,6 +33,7 @@ namespace SpotlightGameJam
         internal void Clear()
         {
             DamageToSanityArmed = false; ConversionAttack = null; ExtraTurns = 0;
+            RedirectEnemyDamage = false;
             OverloadApPermanent = false;
             DrawFromDiscardNextTurn = false; FreeBasicCards = false; FreeAttackCards = false; CyberneticsPayHealth = false;
         }

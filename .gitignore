@@ -124,3 +124,6 @@ __pycache__/
 /.env.*
 issue.md
 .DS_Store
+
+# Local generated screenshots and previews
+/output/

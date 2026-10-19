@@ -10,7 +10,10 @@ namespace SpotlightGameJam
     public sealed class CardInstance
     {
         public Guid Id { get; } = Guid.NewGuid();
-        public CardData Data { get; }
+        private CardData turnData;
+        /// <summary>当前回合使用的卡牌配置；临时转化不改写共享资产或原始身份。</summary>
+        public CardData Data => turnData ? turnData : OriginalData;
+        internal CardData OriginalData { get; }
         public CyberneticInstance Source { get; }
         // 仅牌区在成功增删时维护；外部不能用赋值伪造卡牌归属。
         internal CardZone Zone { get; set; }
@@ -23,6 +26,10 @@ namespace SpotlightGameJam
         internal bool IsInitialHandReward { get; set; }
         /// <summary>创建具有独立身份的卡牌实例，记录配置及可选的来源义体。</summary>
         public CardInstance(CardData data, CyberneticInstance source = null, bool expiresAtTurnEnd = false)
-        { Data = data ?? throw new ArgumentNullException(nameof(data)); Source = source; ExpiresAtTurnEnd = expiresAtTurnEnd; }
+        { OriginalData = data ?? throw new ArgumentNullException(nameof(data)); Source = source; ExpiresAtTurnEnd = expiresAtTurnEnd; }
+        /// <summary>仅替换此实例本回合的牌面和效果，保留身份、牌区和原始配置供回合结束恢复。</summary>
+        internal void TransformForTurn(CardData data) => turnData = data ?? throw new ArgumentNullException(nameof(data));
+        /// <summary>恢复原卡配置；弃牌或洗回抽牌堆的转换牌也必须恢复。</summary>
+        internal void RestoreTurnTransformation() => turnData = null;
     }
 }

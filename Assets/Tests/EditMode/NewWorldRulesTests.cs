@@ -37,6 +37,54 @@ namespace SpotlightGameJam.Tests
             return bonus;
         }
 
+        /// <summary>真实卡组依次完成四部位效果，同回合激活套装；额外回合恢复上限，满手不再回收。</summary>
+        [Test]
+        public void RealDeckEffectsAndSetWorkTogetherAcrossExtraTurn()
+        {
+            var deck = UnityEditor.AssetDatabase.LoadAssetAtPath<CyberneticDeckData>("Assets/GameData/CyberneticDecks/NewWorld.asset");
+            var bonus = UnityEditor.AssetDatabase.LoadAssetAtPath<NewWorldSetBonusData>("Assets/GameData/SetBonuses/NewWorld.asset");
+            var overload = UnityEditor.AssetDatabase.LoadAssetAtPath<CardData>("Assets/GameData/Cards/OverloadCard.asset");
+            var basic = assets.Card(assets.Create<HealEffectData>());
+            using (var context = assets.Context(Enumerable.Repeat(basic, 24).Concat(new[] { overload }).ToArray()))
+            {
+                foreach (var part in deck.cybernetics) context.Run.Loadout.AddInitial(part);
+                context.Run.SetBonuses.Configure(new[] { bonus });
+                var battle = new BattleController(context, 8); Assert.That(battle.StartBattle(), Is.True, battle.LastError);
+                var parts = context.Run.Loadout.GetUsableCards().GroupBy(card => card.Source.Data.slot).Select(group => group.First()).OrderBy(card => card.Source.Data.slot).ToArray();
+                foreach (var card in parts) Assert.That(context.Cybernetic.Hand.TryAdd(card), Is.True);
+                var expected = context.Ordinary.GetDrawPileOrder().Reverse().ToArray();
+                Assert.That(battle.TryPlayRequest(new CardPlayRequest(parts[0], reorder: expected)).Success, Is.True);
+                Assert.That(context.Ordinary.GetDrawPileOrder(), Is.EqualTo(expected));
+                Assert.That(context.Player.Sanity, Is.EqualTo(context.Rules.MaxSanity - 4));
+                Assert.That(battle.TryPlay(parts[1]).Success, Is.True);
+                context.Ordinary.Draw(14); Assert.That(context.Ordinary.Hand.Count, Is.GreaterThan(13));
+                Assert.That(battle.TryPlay(parts[2]).Success, Is.True);
+                var overloadInstance = context.Ordinary.Hand.Cards.Concat(context.Ordinary.DrawPile.Cards).First(card => card.Data == overload);
+                if (!context.Ordinary.Hand.Contains(overloadInstance))
+                { context.Ordinary.DrawPile.TryRemove(overloadInstance); context.Ordinary.Hand.TryAdd(overloadInstance); }
+                Assert.That(battle.TryPlay(overloadInstance).Success, Is.True);
+                Assert.That(context.ActionPoints.Permanent, Is.EqualTo(1)); Assert.That(context.ActionPoints.Temporary, Is.Zero);
+                var discarded = context.Ordinary.Hand.Cards.First(card => card.Data.category == CardCategory.Basic);
+                context.Ordinary.Discard(discarded);
+                Assert.That(battle.TryPlay(parts[3]).Success, Is.True);
+                Assert.That(context.Run.SetBonuses.Active.Count, Is.EqualTo(1));
+                Assert.That(context.Ordinary.Hand.Contains(discarded), Is.True);
+                Assert.That(context.Run.Loadout.Owned.Select(source => source.Durability), Is.All.EqualTo(2));
+                int health = context.Player.Health;
+                Assert.That(battle.EndTurn(), Is.True); Assert.That(battle.TurnNumber, Is.EqualTo(2));
+                Assert.That(context.Player.Health, Is.EqualTo(health), "额外回合跳过敌方行动。");
+                Assert.That(context.ActionPoints.Permanent, Is.EqualTo(1)); Assert.That(context.Ordinary.CanAddToHand(), Is.False);
+                Assert.That(context.Run.SetBonuses.Active.Count, Is.EqualTo(1));
+                int before = context.Ordinary.Hand.Count;
+                var played = context.Ordinary.Hand.Cards.First(card => card.Data.category == CardCategory.Basic);
+                Assert.That(battle.TryPlay(played).Success, Is.True);
+                Assert.That(context.Ordinary.Hand.Count, Is.EqualTo(before - 1));
+                Assert.That(context.Ordinary.DiscardPile.Contains(played), Is.True);
+                context.Enemies[0].ReceiveDamage(9999); context.CheckOutcome();
+                Assert.That(context.Run.SetBonuses.Active, Is.Empty);
+            }
+        }
+
         /// <summary>躯干：解除本回合手牌上限后可以超容量抽牌，恢复上限后立即停止。</summary>
         [Test]
         public void TorsoLiftsHandLimitAndRestoresAtTurnBoundary()

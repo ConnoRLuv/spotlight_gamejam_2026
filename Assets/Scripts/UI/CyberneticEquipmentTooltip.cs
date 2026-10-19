@@ -31,6 +31,7 @@ namespace SpotlightGameJam.UI
                 rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(0.5f, 0.5f);
                 rect.anchoredPosition = Vector2.zero; rect.localScale = Vector3.one * 1.4f;
                 view.Bind(card); view.GetComponent<Button>().transition = Selectable.Transition.None; view.SetInteractable(false);
+                view.SetHoldPreviewEnabled(false);
             }
             Owner = owner; RefreshDetails(uses); Show(0.1f);
             FitCardFace();

@@ -157,10 +157,13 @@ namespace SpotlightGameJam.UI
                 "\n义体牌合计：" + Selection.Sum(data => data.cards.Length) + " 张";
             if (buffs)
             {
-                var preview = Selection.SelectMany(data => data.cards.Select(card => new CyberneticInstance(data, card))).ToArray();
-                var available = (setup.buffs ?? Array.Empty<RunBuffData>()).Where(buff => buff && buff.Validate().Count == 0 && buff.Matches(preview)).ToArray();
-                buffs.text = available.Length == 0 ? "可触发 buff：无完整组合" : "可触发 buff（同回合打出四部位）\n" +
-                    string.Join("\n", available.Select(buff => buff.buffName + "\n" + buff.description));
+                var preview = new CyberneticLoadout();
+                foreach (var data in Selection) preview.AddInitial(data);
+                var available = (setup.buffs ?? Array.Empty<RunBuffData>()).Where(buff => buff && buff.Validate().Count == 0 && buff.Matches(preview.Owned))
+                    .Select(buff => buff.buffName + "\n" + buff.description)
+                    .Concat((setup.setBonuses ?? Array.Empty<NewWorldSetBonusData>()).Where(set => set && set.Validate().Count == 0 && set.IsComplete(preview))
+                        .Select(set => set.setName + "\n" + set.description)).ToArray();
+                buffs.text = available.Length == 0 ? "可触发 buff：无完整组合" : "可触发 buff（同回合打出四部位）\n" + string.Join("\n", available);
             }
             if (detailTitle) detailTitle.text = candidate ? candidate.cards[0].cardName : "未选择义体";
             if (detailInfo) detailInfo.text = candidate ? names[(int)candidate.slot] + " · " + candidate.cards.Length +
@@ -177,6 +180,8 @@ namespace SpotlightGameJam.UI
             var prefab = catalog.Find(candidate.cards[0]); if (!prefab) return;
             var card = Instantiate(prefab, cardPreviewRoot); previewCard = card; card.SetInteractable(false);
             foreach (var graphic in card.GetComponentsInChildren<Graphic>()) graphic.raycastTarget = false;
+            // 禁止出牌点击，但保留根卡面的射线供共用长按预览使用。
+            card.GetComponent<Image>().raycastTarget = true;
             var rect = card.GetComponent<RectTransform>(); rect.anchorMin = rect.anchorMax = rect.pivot = new Vector2(.5f,.5f);
             rect.anchoredPosition = Vector2.zero;
             ScalePreview();

@@ -20,8 +20,9 @@ namespace SpotlightGameJam
         {
             if (card == null || card.Data.category != CardCategory.Basic || card.ExpiresAtTurnEnd)
                 throw new ArgumentException("只能永久改造非临时基本牌。", nameof(card));
-            if (card.IsInitialHandReward) rewards.Remove(card.Data);
-            else transformedOrdinaryCards.Add(card.Data);
+            // 临时转换后的攻击仍对应原来的普通牌，永久改造应移除原配置而非攻击模板。
+            if (card.IsInitialHandReward) rewards.Remove(card.OriginalData);
+            else transformedOrdinaryCards.Add(card.OriginalData);
         }
         /// <summary>新战斗按每种配置的实际移除数量过滤初始牌堆，保留同配置其余牌。</summary>
         public IEnumerable<CardData> ApplyOrdinaryTransformations(IEnumerable<CardData> initial)

@@ -37,11 +37,22 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 59389bece467fcd4ea32a0ddcafaf009, type: 2}
   - {fileID: 11400000, guid: 9f3282cf1d61b3b45a59ea9da05ba3dd, type: 2}
   - {fileID: 11400000, guid: c2953cfb253072848b0b1fce37c9a452, type: 2}
+  - {fileID: 11400000, guid: 8a100b3a3ba05464d86cd0fc1f385e50, type: 2}
+  - {fileID: 11400000, guid: c211987d005301b46ac29db0cbb608be, type: 2}
+  - {fileID: 11400000, guid: a8826942eb183b04db66d6c400aee0c5, type: 2}
+  - {fileID: 11400000, guid: f82398a63c14b584e84ff465ea02958e, type: 2}
+  - {fileID: 11400000, guid: bbd3f1bdda549aa48919a12244b90809, type: 2}
+  - {fileID: 11400000, guid: fa7a2256cb03db7478eda3054d80a0e1, type: 2}
+  - {fileID: 11400000, guid: c36883ec50ddf294797fa04526071c21, type: 2}
+  - {fileID: 11400000, guid: 21f94ff874bd1fc4cb96e14053f24e41, type: 2}
   defaultCybernetics:
-  - {fileID: 11400000, guid: 230cf1632ca38a949a2d24a15c5dd002, type: 2}
-  - {fileID: 11400000, guid: 0a9e9330f35baa64ba0c9a998bbfc7cd, type: 2}
-  - {fileID: 11400000, guid: 21b7d59bce687164ebc31f84df95e936, type: 2}
-  - {fileID: 11400000, guid: 88c1f43e9dbf7314cb15f327bae931a2, type: 2}
+  - {fileID: 11400000, guid: 8a100b3a3ba05464d86cd0fc1f385e50, type: 2}
+  - {fileID: 11400000, guid: c211987d005301b46ac29db0cbb608be, type: 2}
+  - {fileID: 11400000, guid: a8826942eb183b04db66d6c400aee0c5, type: 2}
+  - {fileID: 11400000, guid: f82398a63c14b584e84ff465ea02958e, type: 2}
+  setBonuses:
+  - {fileID: 11400000, guid: df29d67067df21c4583ec06340bc0a9c, type: 2}
   buffs:
   - {fileID: 11400000, guid: 1aa9b4dbc4c37f948af59d62bad13ce4, type: 2}
+  - {fileID: 11400000, guid: bd02e906fdff701478a779e8ad834596, type: 2}
   randomSeed: 1

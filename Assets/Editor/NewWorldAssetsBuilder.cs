@@ -50,6 +50,9 @@ namespace SpotlightGameJam.Editor
             };
             var cards = new CardData[4];
             var sources = new CyberneticData[4];
+            var pricing = AssetDatabase.LoadAssetAtPath<CyberneticShopPriceData>("Assets/GameData/ShopPrices/NewWorld.asset");
+            if (!pricing) throw new InvalidOperationException("缺少新世界系列维修配置。");
+            var partNames = new[] { "脑机", "躯干", "手部", "腿部" };
             for (int i = 0; i < 4; i++)
             {
                 int part = i;
@@ -59,10 +62,14 @@ namespace SpotlightGameJam.Editor
                     value.category = CardCategory.Cybernetic; value.cardType = CardType.Power;
                     value.cost = 0; value.sanityCost = SanityCosts[part]; value.targetType = CardTargetType.Self;
                     value.effects = new[] { effects[part] };
+                    value.artwork = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/Card/义体牌2-" + (part + 1) + ".png");
                 });
                 sources[i] = Asset<CyberneticData>("Assets/GameData/Cybernetics/" + Keys[i] + ".asset", value =>
                 {
                     value.cyberneticId = Keys[i];
+                    value.factionId = "tian-qiong-legion";
+                    value.icon = AssetDatabase.LoadAssetAtPath<Sprite>("Assets/Art/义体/" + partNames[part] + "-新世界.png");
+                    value.shopPricing = pricing;
                     value.slot = (CyberneticSlot)part; value.maxDurability = 3;
                     value.cards = Enumerable.Repeat(cards[part], 3).ToArray();
                 });
@@ -83,10 +90,30 @@ namespace SpotlightGameJam.Editor
             });
 
             for (int i = 0; i < 4; i++) AppendCatalogEntry(catalog, cards[i], MakePrefab(template, i, cards[i], sources[i]));
+            RegisterAdventure(sources, bonus);
 
             AssetDatabase.SaveAssets();
             ValidateCreatedAssets(deck, bonus, cards, sources);
-            Debug.Log("新世界四部位、牌组与套装配置已创建；请把牌组挂到出发配置/GameBootstrap，并把套装挂到 setBonuses。");
+            Debug.Log("新世界四部位、卡面、维修及出发套装配置已接入；BattleScene 未修改。");
+        }
+
+        /// <summary>补齐出发候选和套装；旧默认原制式迁移为新世界，保留成员自定义的混搭默认。</summary>
+        private static void RegisterAdventure(CyberneticData[] parts, NewWorldSetBonusData bonus)
+        {
+            var setup = AssetDatabase.LoadAssetAtPath<AdventureSetupData>("Assets/GameData/AdventureSetup.asset");
+            if (!setup) throw new InvalidOperationException("请先创建 StartScene 探索配置。");
+            setup.availableCybernetics = (setup.availableCybernetics ?? Array.Empty<CyberneticData>()).Concat(parts).Distinct().ToArray();
+            setup.setBonuses = (setup.setBonuses ?? Array.Empty<NewWorldSetBonusData>()).Concat(new[] { bonus }).Distinct().ToArray();
+            var original = AssetDatabase.LoadAssetAtPath<CyberneticDeckData>("Assets/GameData/CyberneticDecks/TianQiongLegion.asset");
+            if (setup.defaultCybernetics == null || setup.defaultCybernetics.Length == 0 ||
+                original && setup.defaultCybernetics.SequenceEqual(original.cybernetics)) setup.defaultCybernetics = parts.ToArray();
+            EditorUtility.SetDirty(setup);
+            var transformation = AssetDatabase.LoadAssetAtPath<TransformBasicToCyberneticEffectData>("Assets/GameData/Effects/PrometheusTorso.asset");
+            if (transformation)
+            {
+                transformation.candidates = (transformation.candidates ?? Array.Empty<CyberneticData>()).Concat(parts).Distinct().ToArray();
+                EditorUtility.SetDirty(transformation);
+            }
         }
 
         /// <summary>递归创建缺失的 Unity 资产目录，不覆盖已有目录和元数据。</summary>
@@ -131,6 +158,16 @@ namespace SpotlightGameJam.Editor
                 root.GetComponent<CardView>().Configure(card, source, color, root.GetComponent<Image>(),
                     root.GetComponent<Button>(), root.transform.Find("Name").GetComponent<Text>(),
                     root.transform.Find("Cost").GetComponent<Text>(), description, root.transform.Find("Source").GetComponent<Text>());
+                // 指定资源是带完整印刷文字的卡面，保留模板字段供动态数据绑定，避免文字重复覆盖。
+                if (card.artwork)
+                {
+                    var image = root.GetComponent<Image>(); image.sprite = card.artwork; image.preserveAspect = true;
+                    root.GetComponent<CardView>().Configure(card, source, Color.white, image, root.GetComponent<Button>(),
+                        root.transform.Find("Name").GetComponent<Text>(), root.transform.Find("Cost").GetComponent<Text>(), description,
+                        root.transform.Find("Source").GetComponent<Text>());
+                    foreach (var name in new[] { "Name", "Cost", "Description", "Source", "ColorPlaceholder" })
+                    { var child = root.transform.Find(name); if (child) child.gameObject.SetActive(false); }
+                }
                 return PrefabUtility.SaveAsPrefabAsset(root, path).GetComponent<CardView>();
             }
             finally { UnityEngine.Object.DestroyImmediate(root); }
