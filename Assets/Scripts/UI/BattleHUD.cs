@@ -41,7 +41,8 @@ namespace SpotlightGameJam.UI
         private float lastViewportHeight = -1;
         private readonly Vector3[] handTabCorners = new Vector3[4];
         public BattleController Battle => battle;
-        public bool IsChoosing => (choicePanel && choicePanel.activeSelf) || (drawPilePanel && drawPilePanel.IsReordering) ||
+        public bool IsChoosing => (scene && scene.settingsPanel && scene.settingsPanel.IsOpen) ||
+            (choicePanel && choicePanel.activeSelf) || (drawPilePanel && drawPilePanel.IsReordering) ||
             (discardPanel && discardPanel.IsSelecting) || (handDrag && handDrag.IsDragging);
         public CardInstance PendingCard => pendingCard;
 

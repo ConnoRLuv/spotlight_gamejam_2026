@@ -15,6 +15,7 @@ namespace SpotlightGameJam.UI
         // 战斗顶栏已移除地图进度，保留旧字段供既有场景序列化兼容，允许为空。
         public Text mapProgressText;
         public Button settingsButton;
+        public SettingsPanelController settingsPanel;
 
         [Header("角色展示区")]
         public Image playerPortrait;
